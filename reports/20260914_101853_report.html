@@ -1,0 +1,440 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+
+    <title>
+        Pressure Report - 20260914_101853
+    </title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            color: #1f2937;
+            background: #ffffff;
+        }
+
+        h1,
+        h2 {
+            color: #111827;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            padding: 16px;
+            background: #f9fafb;
+        }
+
+        .label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+        }
+
+        .value {
+            font-size: 18px;
+            font-weight: 600;
+            margin-top: 6px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 24px;
+        }
+
+        th,
+        td {
+            border: 1px solid #d1d5db;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background: #e5e7eb;
+        }
+
+        .pass {
+            color: #047857;
+            font-weight: 700;
+        }
+
+        .fail {
+            color: #b91c1c;
+            font-weight: 700;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            margin: 30px 0;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #pressureChart {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .report-header h1 {
+            margin: 0;
+        }
+
+        .print-button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 8px;
+            background: #2563eb;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .print-button:hover {
+            background: #1d4ed8;
+        }
+
+        @media print {
+            .print-button {
+                display: none;
+            }
+
+            body {
+                margin: 20px;
+            }
+
+            .card {
+                break-inside: avoid;
+            }
+
+            .chart-container {
+                break-inside: avoid;
+            }
+
+            table {
+                break-inside: auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="report-header">
+        <h1>Pressure Report</h1>
+
+        <button class="print-button" onclick="window.print()">
+            🖨 Print Report
+        </button>
+    </div>
+
+    <div class="grid">
+
+        <div class="card">
+            <div class="label">Session ID</div>
+            <div class="value">20260914_101853</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Status</div>
+            <div class="value">Completed</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Test Medium</div>
+            <div class="value">Air</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Unit</div>
+            <div class="value">psi</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Start Pressure</div>
+            <div class="value">20.25 psi</div>
+        </div>
+
+        <div class="card">
+            <div class="label">End Pressure</div>
+            <div class="value">20.24 psi</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Pressure Drop</div>
+            <div class="value">0.01 psi</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Max Allowable Pressure Drop</div>
+            <div class="value">2.50 psi</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Result</div>
+            <div class="value pass">PASS</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Duration</div>
+            <div class="value">0:02:29</div>
+        </div>
+
+    </div>
+
+
+    <h2>UUT and Customer Details</h2>
+
+    <div class="grid">
+
+        <div class="card">
+            <div class="label">UUT Name</div>
+            <div class="value">Valve Assembly</div>
+        </div>
+
+        <div class="card">
+            <div class="label">UUT Tag</div>
+            <div class="value">UUT-2048</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Model Number</div>
+            <div class="value">RVG-200</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Serial Number</div>
+            <div class="value">SN-7781</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Manufacturer</div>
+            <div class="value"></div>
+        </div>
+
+        <div class="card">
+            <div class="label">Customer</div>
+            <div class="value">Northwind Systems</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Project</div>
+            <div class="value">Line Pressure Test</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Work Order</div>
+            <div class="value">WO-521</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Test Location</div>
+            <div class="value">Plant 2 / Bay 6</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Operator</div>
+            <div class="value">Operator A</div>
+        </div>
+
+    </div>
+
+    <h2>Pressure vs Time</h2>
+    <div class="chart-container">
+            <canvas id="pressureChart"></canvas>
+        </div>
+
+    <h2>Data Log</h2>
+
+    <table>
+
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Elapsed</th>
+                <th>Pressure</th>
+                <th>Unit</th>
+                <th>Pressure Drop</th>
+                <th>Result</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            <tr><td>2026-09-14 10:18:53</td><td>0:00:00</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:18:55</td><td>0:00:02</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:18:57</td><td>0:00:04</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:18:59</td><td>0:00:06</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:00</td><td>0:00:07</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:02</td><td>0:00:09</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:04</td><td>0:00:11</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:06</td><td>0:00:13</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:07</td><td>0:00:14</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:09</td><td>0:00:16</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:11</td><td>0:00:18</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:13</td><td>0:00:20</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:14</td><td>0:00:21</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:16</td><td>0:00:23</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:18</td><td>0:00:25</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:20</td><td>0:00:27</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:21</td><td>0:00:28</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:23</td><td>0:00:30</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:25</td><td>0:00:32</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:27</td><td>0:00:34</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:28</td><td>0:00:35</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:30</td><td>0:00:37</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:32</td><td>0:00:39</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:34</td><td>0:00:41</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:35</td><td>0:00:42</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:37</td><td>0:00:44</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:39</td><td>0:00:46</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:41</td><td>0:00:48</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:42</td><td>0:00:49</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:44</td><td>0:00:51</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:46</td><td>0:00:53</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:48</td><td>0:00:55</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:49</td><td>0:00:56</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:51</td><td>0:00:58</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:53</td><td>0:01:00</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:55</td><td>0:01:02</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:56</td><td>0:01:03</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:19:58</td><td>0:01:05</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:00</td><td>0:01:07</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:02</td><td>0:01:09</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:03</td><td>0:01:10</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:05</td><td>0:01:12</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:07</td><td>0:01:14</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:09</td><td>0:01:16</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:10</td><td>0:01:17</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:12</td><td>0:01:19</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:14</td><td>0:01:21</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:16</td><td>0:01:23</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:17</td><td>0:01:24</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:19</td><td>0:01:26</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:21</td><td>0:01:28</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:23</td><td>0:01:30</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:24</td><td>0:01:31</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:26</td><td>0:01:33</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:28</td><td>0:01:35</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:30</td><td>0:01:37</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:31</td><td>0:01:38</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:33</td><td>0:01:40</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:35</td><td>0:01:42</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:37</td><td>0:01:44</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:38</td><td>0:01:45</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:40</td><td>0:01:47</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:42</td><td>0:01:49</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:44</td><td>0:01:51</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:45</td><td>0:01:52</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:47</td><td>0:01:54</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:49</td><td>0:01:56</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:51</td><td>0:01:58</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:52</td><td>0:01:59</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:54</td><td>0:02:01</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:56</td><td>0:02:03</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:58</td><td>0:02:05</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:20:59</td><td>0:02:06</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:21:01</td><td>0:02:08</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:21:03</td><td>0:02:10</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:21:05</td><td>0:02:12</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:21:06</td><td>0:02:13</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:21:08</td><td>0:02:15</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:21:10</td><td>0:02:17</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:21:12</td><td>0:02:19</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:21:13</td><td>0:02:20</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:21:15</td><td>0:02:22</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:21:17</td><td>0:02:24</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:21:19</td><td>0:02:26</td><td>20.25</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-14 10:21:20</td><td>0:02:27</td><td>20.24</td><td>psi</td><td>0.01</td><td>PASS</td></tr>
+        </tbody>
+
+    </table>
+
+
+    <h2>Remarks</h2>
+
+    <p>Routine acceptance test.</p>
+
+
+    <script>
+
+        const labels = ["0:00:00", "0:00:02", "0:00:04", "0:00:06", "0:00:07", "0:00:09", "0:00:11", "0:00:13", "0:00:14", "0:00:16", "0:00:18", "0:00:20", "0:00:21", "0:00:23", "0:00:25", "0:00:27", "0:00:28", "0:00:30", "0:00:32", "0:00:34", "0:00:35", "0:00:37", "0:00:39", "0:00:41", "0:00:42", "0:00:44", "0:00:46", "0:00:48", "0:00:49", "0:00:51", "0:00:53", "0:00:55", "0:00:56", "0:00:58", "0:01:00", "0:01:02", "0:01:03", "0:01:05", "0:01:07", "0:01:09", "0:01:10", "0:01:12", "0:01:14", "0:01:16", "0:01:17", "0:01:19", "0:01:21", "0:01:23", "0:01:24", "0:01:26", "0:01:28", "0:01:30", "0:01:31", "0:01:33", "0:01:35", "0:01:37", "0:01:38", "0:01:40", "0:01:42", "0:01:44", "0:01:45", "0:01:47", "0:01:49", "0:01:51", "0:01:52", "0:01:54", "0:01:56", "0:01:58", "0:01:59", "0:02:01", "0:02:03", "0:02:05", "0:02:06", "0:02:08", "0:02:10", "0:02:12", "0:02:13", "0:02:15", "0:02:17", "0:02:19", "0:02:20", "0:02:22", "0:02:24", "0:02:26", "0:02:27"];
+
+        const pressures = [20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.25, 20.24];
+
+        const ctx = document.getElementById('pressureChart');
+
+        new Chart(ctx, {
+            type: 'line',
+
+            data: {
+                labels: labels,
+
+                datasets: [{
+                    label: 'Pressure',
+                    data: pressures,
+
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.15)',
+
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 2
+                }]
+            },
+
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                },
+
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Elapsed Time'
+                        }
+                    },
+
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Pressure'
+                        }
+                    }
+                }
+            }
+        });
+
+    </script>
+
+</body>
+</html>

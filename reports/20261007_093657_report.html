@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Pressure Test Report - 20261007_093657</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        font-family: Arial, Helvetica, sans-serif;
+        color: #1f2937;
+        background: #fff;
+        margin: 0;
+        padding: 20px;
+    }
+    .report {
+        max-width: 1200px;
+        margin: 0 auto;
+        border: 2px solid #1f2937;
+    }
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: stretch;
+        border-bottom: 1px solid #1f2937;
+    }
+    .logo-box {
+        padding: 14px 18px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 240px;
+        border-right: 1px solid #1f2937;
+    }
+    .logo-fallback {
+        display: inline-block;
+        font-weight: 800;
+        font-size: 22px;
+        color: #c8102e;
+        letter-spacing: -0.5px;
+    }
+    .cust-box {
+        flex: 1;
+        padding: 10px 18px;
+        font-size: 12px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px 20px;
+    }
+    .cust-box div { display: flex; gap: 6px; }
+    .cust-box .label { color: #6b7280; min-width: 90px; }
+    .cust-box .value { font-weight: 700; }
+
+    .main {
+        display: grid;
+        grid-template-columns: 1.6fr 1fr;
+        border-bottom: 1px solid #1f2937;
+    }
+    .chart-pane {
+        padding: 12px;
+        border-right: 1px solid #1f2937;
+        min-height: 420px;
+    }
+    .chart-wrap { position: relative; height: 400px; width: 100%; }
+    .tests-pane { padding: 12px; overflow-y: auto; max-height: 440px; }
+
+    .test-block {
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        padding: 10px 12px;
+        margin-bottom: 10px;
+        background: #f9fafb;
+    }
+    .test-block-title {
+        font-weight: 700;
+        margin-bottom: 6px;
+        font-size: 13px;
+    }
+    table.kv {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+    }
+    table.kv td {
+        padding: 3px 4px;
+        border-bottom: 1px dashed #e5e7eb;
+    }
+    table.kv td:first-child { color: #6b7280; width: 55%; }
+    table.kv td:last-child { text-align: right; font-weight: 600; }
+
+    .pass { color: #047857; font-weight: 700; }
+    .fail { color: #b91c1c; font-weight: 700; }
+
+    .data-log {
+        padding: 12px;
+        border-bottom: 1px solid #1f2937;
+    }
+    .data-log h3 {
+        margin: 0 0 8px 0;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    table.log {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+    }
+    table.log th, table.log td {
+        border: 1px solid #d1d5db;
+        padding: 5px 6px;
+        text-align: left;
+    }
+    table.log th { background: #f3f4f6; }
+
+    .footer {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        font-size: 12px;
+    }
+    .footer .cell {
+        padding: 10px 18px;
+        border-right: 1px solid #1f2937;
+        border-bottom: 1px solid #1f2937;
+    }
+    .footer .cell:nth-child(2n) { border-right: none; }
+    .footer .label { color: #6b7280; margin-right: 6px; }
+    .footer .sig-line {
+        display: inline-block;
+        border-bottom: 1px solid #1f2937;
+        min-width: 160px;
+        margin-left: 8px;
+    }
+    .remarks {
+        padding: 12px 18px;
+        font-size: 12px;
+        border-bottom: 1px solid #1f2937;
+    }
+    @media print {
+        body { padding: 0; }
+        .report { border-width: 1px; }
+    }
+</style>
+</head>
+<body>
+<div class="report">
+
+    <!-- HEADER -->
+    <div class="header">
+        <div class="logo-box">
+            <span class="logo-fallback">Weatherford</span>
+        </div>
+        <div class="cust-box">
+            <div><span class="label">Customer</span><span class="value">Weatherford</span></div>
+            <div><span class="label">JDE</span><span class="value">2867002</span></div>
+            <div><span class="label">Work Order</span><span class="value">10482051</span></div>
+            <div><span class="label">Documents</span><span class="value">D001130925</span></div>
+            <div><span class="label">Tools</span><span class="value">VALVE, RESERVOIR ISOLATION</span></div>
+            <div><span class="label">Technician</span><span class="value">YASIR SHAH</span></div>
+            <div><span class="label">Description</span><span class="value">TEST PORT-1 CH-1 / TEST PORT-3 CH-2</span></div>
+            <div><span class="label">Recorded on</span><span class="value">2026-10-07</span></div>
+        </div>
+    </div>
+
+    <!-- CHART + TEST RESULTS -->
+    <div class="main">
+        <div class="chart-pane">
+            <div class="chart-wrap">
+                <canvas id="pressureChart"></canvas>
+            </div>
+        </div>
+        <div class="tests-pane">
+            <div style="font-size:13px; font-weight:700; margin-bottom:8px;">
+                Overall: <span class="pass">PASS</span>
+                &nbsp;&bull;&nbsp; Duration: 0:00:30
+            </div>
+            
+        <div class="test-block">
+            <div class="test-block-title">
+                Test 1 &hellip; <span class="pass">PASS</span>
+            </div>
+            <table class="kv">
+                <tr><td>Input</td><td>20K</td></tr>
+                <tr><td>Channel</td><td>CH-1</td></tr>
+                <tr><td>Test duration</td><td>0:01:00</td></tr>
+                <tr><td>Start value</td><td>7423.40 psi</td></tr>
+                <tr><td>End value</td><td>7423.48 psi</td></tr>
+                <tr><td>Max. error</td><td>0.39 psi</td></tr>
+                <tr><td>Relative error</td><td>0.01 %</td></tr>
+            </table>
+        </div>
+        
+
+        <div class="test-block">
+            <div class="test-block-title">
+                Test 2 &hellip; <span class="pass">PASS</span>
+            </div>
+            <table class="kv">
+                <tr><td>Input</td><td>20K</td></tr>
+                <tr><td>Channel</td><td>CH-2</td></tr>
+                <tr><td>Test duration</td><td>0:01:00</td></tr>
+                <tr><td>Start value</td><td>-- psi</td></tr>
+                <tr><td>End value</td><td>-- psi</td></tr>
+                <tr><td>Max. error</td><td>0.00 psi</td></tr>
+                <tr><td>Relative error</td><td>0.00 %</td></tr>
+            </table>
+        </div>
+        
+        </div>
+    </div>
+
+    <!-- DATA LOG -->
+    <div class="data-log">
+        <h3>Data Log</h3>
+        <table class="log">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Elapsed</th>
+                    <th>Channel</th>
+                    <th>Pressure (psi)</th>
+                    <th>Unit</th>
+                    <th>Pressure Drop</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>2026-10-07 09:36:58</td><td>0:00:01</td><td>CH-1</td><td>7423.4</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-10-07 09:37:00</td><td>0:00:03</td><td>CH-1</td><td>7423.38</td><td>psi</td><td>0.02</td><td>Pending</td></tr>
+<tr><td>2026-10-07 09:37:02</td><td>0:00:05</td><td>CH-1</td><td>7423.78</td><td>psi</td><td>-0.38</td><td>Pending</td></tr>
+<tr><td>2026-10-07 09:37:05</td><td>0:00:08</td><td>CH-1</td><td>7423.58</td><td>psi</td><td>-0.18</td><td>Pending</td></tr>
+<tr><td>2026-10-07 09:37:07</td><td>0:00:10</td><td>CH-1</td><td>7423.79</td><td>psi</td><td>-0.39</td><td>Pending</td></tr>
+<tr><td>2026-10-07 09:37:09</td><td>0:00:12</td><td>CH-1</td><td>7423.59</td><td>psi</td><td>-0.19</td><td>Pending</td></tr>
+<tr><td>2026-10-07 09:37:12</td><td>0:00:15</td><td>CH-1</td><td>7423.54</td><td>psi</td><td>-0.14</td><td>Pending</td></tr>
+<tr><td>2026-10-07 09:37:14</td><td>0:00:17</td><td>CH-1</td><td>7423.67</td><td>psi</td><td>-0.27</td><td>Pending</td></tr>
+<tr><td>2026-10-07 09:37:16</td><td>0:00:19</td><td>CH-1</td><td>7423.53</td><td>psi</td><td>-0.13</td><td>Pending</td></tr>
+<tr><td>2026-10-07 09:37:18</td><td>0:00:21</td><td>CH-1</td><td>7423.4</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-10-07 09:37:21</td><td>0:00:24</td><td>CH-1</td><td>7423.68</td><td>psi</td><td>-0.28</td><td>Pending</td></tr>
+<tr><td>2026-10-07 09:37:23</td><td>0:00:26</td><td>CH-1</td><td>7423.42</td><td>psi</td><td>-0.02</td><td>Pending</td></tr>
+<tr><td>2026-10-07 09:37:25</td><td>0:00:28</td><td>CH-1</td><td>7423.48</td><td>psi</td><td>-0.08</td><td>PASS</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- REMARKS -->
+    <div class="remarks">
+        <strong>Remarks:</strong> Routine acceptance test.
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        <div class="cell"><span class="label">JDE :</span>2867002</div>
+        <div class="cell"><span class="label">Documents :</span>D001130925</div>
+        <div class="cell"><span class="label">Technician :</span>YASIR SHAH</div>
+        <div class="cell"><span class="label">Recorded on :</span>2026-10-07</div>
+        <div class="cell" style="grid-column: 1 / -1; border-right: none;">
+            <span class="label">Signature :</span>
+            <span class="sig-line"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+const labels = ["0:00:01", "0:00:03", "0:00:05", "0:00:08", "0:00:10", "0:00:12", "0:00:15", "0:00:17", "0:00:19", "0:00:21", "0:00:24", "0:00:26", "0:00:28"];
+const datasets = [{"label": "CH-1", "data": [7423.4, 7423.38, 7423.78, 7423.58, 7423.79, 7423.59, 7423.54, 7423.67, 7423.53, 7423.4, 7423.68, 7423.42, 7423.48], "borderColor": "#d97706", "backgroundColor": "transparent", "borderWidth": 2, "pointRadius": 0, "tension": 0.2, "spanGaps": true}, {"label": "CH-2", "data": [], "borderColor": "#2563eb", "backgroundColor": "transparent", "borderWidth": 2, "pointRadius": 0, "tension": 0.2, "spanGaps": true}];
+
+new Chart(document.getElementById('pressureChart'), {
+    type: 'line',
+    data: { labels: labels, datasets: datasets },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+            legend: { display: true, position: 'top' }
+        },
+        scales: {
+            x: {
+                title: { display: true, text: 'Elapsed Time' },
+                ticks: { autoSkip: true, maxTicksLimit: 8 }
+            },
+            y: {
+                title: { display: true, text: 'Pressure (psi)' }
+            }
+        }
+    }
+});
+</script>
+</body>
+</html>

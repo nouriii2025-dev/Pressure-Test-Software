@@ -1,0 +1,1399 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pressure Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* ============================================================
+           DESIGN TOKENS
+           ============================================================ */
+        :root {
+            --bg: #eef1f5;
+            --surface: #ffffff;
+            --surface-2: #f6f8fa;
+            --ink: #121c2b;
+            --ink-2: #3b4859;
+            --muted: #66758a;
+            --line: #dde3eb;
+            --line-strong: #c6cfdb;
+
+            --brand: #0b5cad;
+            --brand-ink: #08407a;
+            --brand-tint: #e5eefa;
+
+            --ok: #12805c;
+            --ok-tint: #dff3ea;
+            --bad: #c42b2b;
+            --bad-tint: #fbe4e4;
+            --warn: #a85f00;
+            --warn-tint: #fdeccf;
+            --idle: #5b697c;
+            --idle-tint: #e8ecf1;
+
+            --radius-lg: 14px;
+            --radius-md: 10px;
+            --radius-sm: 7px;
+
+            --shadow-1: 0 1px 2px rgba(18, 28, 43, 0.06), 0 1px 1px rgba(18, 28, 43, 0.04);
+            --shadow-2: 0 8px 24px -8px rgba(18, 28, 43, 0.14);
+
+            --topbar-h: 64px;
+            --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+        }
+
+        * { box-sizing: border-box; }
+
+        html { -webkit-text-size-adjust: 100%; }
+
+        body {
+            margin: 0;
+            font-family: var(--font);
+            font-size: 14px;
+            line-height: 1.45;
+            background: var(--bg);
+            color: var(--ink);
+            font-variant-numeric: tabular-nums;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        :focus-visible {
+            outline: 2px solid var(--brand);
+            outline-offset: 2px;
+        }
+
+        /* ============================================================
+           TOP BAR
+           ============================================================ */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            height: var(--topbar-h);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 0 28px;
+            background: #0f1b2d;
+            color: #e8eef7;
+            border-bottom: 1px solid #1e2d45;
+        }
+
+        .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+
+        .brand-badge {
+            width: 38px; height: 38px;
+            border-radius: 10px;
+            background: #17294a;
+            border: 1px solid #2a4170;
+            display: grid; place-items: center;
+            flex: none;
+        }
+
+        .brand-badge svg { width: 24px; height: 24px; display: block; }
+
+        .brand h1 {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 600;
+            letter-spacing: 0.005em;
+            line-height: 1.2;
+        }
+
+        .brand small {
+            display: block;
+            color: #8fa2bd;
+            font-size: 0.78rem;
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .status-pill {
+            display: inline-flex; align-items: center; gap: 10px;
+            padding: 7px 14px 7px 12px;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            background: #17263d;
+            border: 1px solid #2b3f5e;
+            color: #d5deec;
+            flex: none;
+        }
+
+        .status-dot {
+            width: 9px; height: 9px; border-radius: 50%;
+            background: #7e8ea5;
+        }
+
+        .status-pill.is-running {
+            background: #0f3a2f;
+            border-color: #1b6a53;
+            color: #c6f2e1;
+        }
+
+        .status-pill.is-running .status-dot {
+            background: #34d399;
+            animation: pulse 1.8s ease-out infinite;
+        }
+
+        @keyframes pulse {
+            0%   { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55); }
+            100% { box-shadow: 0 0 0 9px rgba(52, 211, 153, 0); }
+        }
+
+        /* ============================================================
+           LAYOUT
+           ============================================================ */
+        .layout {
+            display: grid;
+            grid-template-columns: 400px minmax(0, 1fr);
+            gap: 24px;
+            max-width: 1760px;
+            margin: 0 auto;
+            padding: 24px 28px 40px;
+            align-items: start;
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-1);
+        }
+
+        /* ============================================================
+           CONFIG SIDEBAR
+           ============================================================ */
+        .sidebar {
+            position: sticky;
+            top: calc(var(--topbar-h) + 24px);
+            max-height: calc(100vh - var(--topbar-h) - 48px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 18px 20px 14px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .sidebar-head h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+
+        .count-chip {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--brand-ink);
+            background: var(--brand-tint);
+            padding: 3px 10px;
+            border-radius: 999px;
+        }
+
+        .sidebar-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px 20px 8px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--line-strong) transparent;
+        }
+
+        /* Collapsible sections */
+        .section { border-bottom: 1px solid var(--line); padding: 4px 0; }
+        .section:last-child { border-bottom: none; }
+
+        .section > summary {
+            list-style: none;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 0;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--ink-2);
+            user-select: none;
+        }
+
+        .section > summary::-webkit-details-marker { display: none; }
+
+        .section > summary::after {
+            content: '';
+            width: 7px; height: 7px;
+            border-right: 2px solid var(--muted);
+            border-bottom: 2px solid var(--muted);
+            transform: rotate(45deg);
+            margin-right: 3px;
+            transition: transform 0.15s ease;
+        }
+
+        .section[open] > summary::after { transform: rotate(-135deg); }
+
+        .section-body { padding: 2px 0 14px; }
+
+        /* Form fields */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            column-gap: 12px;
+            row-gap: 12px;
+        }
+
+        .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+        .field.full { grid-column: 1 / -1; }
+
+        label {
+            font-size: 0.78rem;
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            font: inherit;
+            font-size: 0.9rem;
+            color: var(--ink);
+            border: 1px solid var(--line-strong);
+            background: var(--surface);
+            border-radius: var(--radius-sm);
+            padding: 8px 10px;
+            min-height: 38px;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2366758a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 11px center;
+            padding-right: 30px;
+        }
+
+        input:hover, select:hover, textarea:hover { border-color: #a9b6c7; }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--brand);
+            box-shadow: 0 0 0 3px rgba(11, 92, 173, 0.16);
+        }
+
+        textarea { resize: vertical; min-height: 76px; }
+
+        /* Channel selector */
+        .channel-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .channel-chip {
+            display: flex; align-items: center; justify-content: center;
+            gap: 8px;
+            min-height: 40px;
+            padding: 8px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--line-strong);
+            background: var(--surface);
+            color: var(--ink-2);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            user-select: none;
+            transition: background 0.12s ease, border-color 0.12s ease;
+        }
+
+        .channel-chip:hover { border-color: #a9b6c7; background: var(--surface-2); }
+
+        .channel-chip input { display: none; }
+
+        .channel-chip .ch-dot {
+            width: 10px; height: 10px;
+            border-radius: 3px;
+            background: transparent;
+            border: 2px solid var(--c, #94a3b8);
+        }
+
+        .channel-chip.active {
+            border-color: var(--c, var(--brand));
+            background: var(--surface);
+            color: var(--ink);
+            box-shadow: inset 0 0 0 1px var(--c, var(--brand));
+        }
+
+        .channel-chip.active .ch-dot { background: var(--c, var(--brand)); }
+
+        .channel-tools { display: flex; gap: 8px; margin-top: 10px; }
+
+        .small-btn {
+            flex: 1;
+            padding: 7px 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--brand-ink);
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+        }
+
+        .small-btn:hover { background: var(--brand-tint); }
+
+        /* Rating rows */
+        .rating-row {
+            display: grid;
+            grid-template-columns: 52px minmax(0, 1fr);
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .rating-row:last-child { margin-bottom: 0; }
+
+        .rating-row label {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 0.8rem;
+            color: var(--ink);
+            font-weight: 600;
+        }
+
+        .rating-row label::before {
+            content: '';
+            width: 8px; height: 8px; border-radius: 2px;
+            background: var(--c, var(--brand));
+        }
+
+        .hint { font-size: 0.82rem; color: var(--muted); padding: 4px 0; }
+
+        /* ============================================================
+           BUTTONS
+           ============================================================ */
+        button {
+            font: inherit;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            padding: 0 16px;
+            min-height: 40px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+        }
+
+        button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        .primary { background: var(--brand); color: #fff; }
+        .primary:hover:not(:disabled) { background: var(--brand-ink); }
+
+        .danger { background: var(--surface); color: var(--bad); border-color: #e3aaaa; }
+        .danger:hover:not(:disabled) { background: var(--bad-tint); border-color: var(--bad); }
+
+        .secondary { background: var(--surface); color: var(--ink-2); border-color: var(--line-strong); }
+        .secondary:hover:not(:disabled) { background: var(--surface-2); border-color: #a9b6c7; }
+
+        .sidebar-actions {
+            padding: 14px 20px 18px;
+            border-top: 1px solid var(--line);
+            background: var(--surface);
+            display: grid;
+            gap: 10px;
+        }
+
+        .action-main { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+        .action-main button { min-height: 44px; font-size: 0.95rem; }
+
+        .action-secondary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .action-secondary button { padding: 0 8px; font-size: 0.8rem; min-height: 36px; }
+
+        /* ============================================================
+           MAIN COLUMN
+           ============================================================ */
+        .main { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+
+        .section-label {
+            display: flex; align-items: baseline; justify-content: space-between;
+            margin: 0 0 12px;
+        }
+
+        .section-label h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+        .section-label span { font-size: 0.8rem; color: var(--muted); }
+
+        /* Live channel readouts */
+        .channel-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 16px;
+        }
+
+        .ch-card {
+            position: relative;
+            padding: 16px 18px 14px;
+            border-radius: var(--radius-lg);
+            background: var(--surface);
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow-1);
+            overflow: hidden;
+        }
+
+        .ch-card::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 4px;
+            background: var(--c, var(--brand));
+        }
+
+        .ch-card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .ch-name { font-weight: 700; font-size: 0.9rem; color: var(--ink); }
+
+        .metric-label { color: var(--muted); font-size: 0.76rem; margin-bottom: 2px; }
+
+        .metric-value {
+            font-weight: 600;
+            font-size: clamp(1.7rem, 2.4vw, 2.2rem);
+            line-height: 1.1;
+            letter-spacing: -0.01em;
+            display: flex; align-items: baseline; gap: 6px;
+        }
+
+        .metric-unit { font-size: 0.85rem; color: var(--muted); font-weight: 500; letter-spacing: 0; }
+
+        .ch-footer {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            margin-top: 14px;
+            padding-top: 10px;
+            border-top: 1px solid var(--line);
+        }
+
+        .ch-footer .k { display: block; font-size: 0.72rem; color: var(--muted); }
+        .ch-footer .v { font-size: 0.9rem; font-weight: 600; color: var(--ink); }
+
+        .empty-state {
+            grid-column: 1 / -1;
+            display: flex; align-items: center; gap: 16px;
+            padding: 22px 24px;
+            border: 1px dashed var(--line-strong);
+            border-radius: var(--radius-lg);
+            background: var(--surface);
+            color: var(--ink-2);
+        }
+
+        .empty-state .icon {
+            flex: none;
+            width: 44px; height: 44px; border-radius: 12px;
+            background: var(--brand-tint); color: var(--brand);
+            display: grid; place-items: center;
+        }
+
+        .empty-state .icon svg { width: 24px; height: 24px; }
+        .empty-state strong { display: block; color: var(--ink); font-size: 0.95rem; margin-bottom: 2px; }
+        .empty-state span { font-size: 0.88rem; color: var(--muted); }
+
+        /* Result badges */
+        .result-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 0.72rem;
+            letter-spacing: 0.01em;
+            white-space: nowrap;
+        }
+
+        .result-badge::before {
+            content: '';
+            width: 6px; height: 6px; border-radius: 50%;
+            background: currentColor;
+        }
+
+        .result-pass    { background: var(--ok-tint);   color: var(--ok); }
+        .result-fail    { background: var(--bad-tint);  color: var(--bad); }
+        .result-pending { background: var(--idle-tint); color: var(--idle); }
+        .result-err     { background: var(--warn-tint); color: var(--warn); }
+
+        /* Chart */
+        .chart-panel { padding: 18px 20px 20px; }
+
+        .panel-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 14px;
+        }
+
+        .panel-header h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+
+        .meta-chip {
+            font-size: 0.78rem; font-weight: 600; color: var(--ink-2);
+            background: var(--surface-2);
+            border: 1px solid var(--line);
+            padding: 3px 10px; border-radius: 999px;
+        }
+
+        .chart-wrap { position: relative; height: 400px; width: 100%; }
+
+        /* Bottom grid */
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+            gap: 24px;
+            align-items: start;
+        }
+
+        .table-panel, .summary-panel { padding: 18px 20px 20px; }
+
+        .table-scroll {
+            overflow: auto;
+            max-height: 340px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-md);
+            scrollbar-width: thin;
+        }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+
+        th, td { padding: 9px 12px; text-align: left; white-space: nowrap; }
+
+        td { border-bottom: 1px solid var(--line); }
+        tbody tr:last-child td { border-bottom: none; }
+
+        th {
+            position: sticky; top: 0;
+            background: var(--surface-2);
+            color: var(--muted);
+            font-size: 0.74rem;
+            font-weight: 600;
+            border-bottom: 1px solid var(--line-strong);
+            z-index: 1;
+        }
+
+        tbody tr:hover { background: var(--surface-2); }
+
+        td.num { text-align: right; }
+        th.num { text-align: right; }
+
+        .ch-tag { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; }
+        .ch-tag::before {
+            content: ''; width: 8px; height: 8px; border-radius: 2px;
+            background: var(--c, var(--brand));
+        }
+
+        .table-empty { text-align: center; color: var(--muted); padding: 28px 12px; }
+
+        /* Per-channel summary */
+        .summary-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+
+        .summary-list li {
+            padding: 12px 14px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-left: 4px solid var(--c, var(--line-strong));
+            border-radius: var(--radius-md);
+            display: flex; flex-direction: column; gap: 10px;
+        }
+
+        .summary-list li.summary-empty {
+            border-left-color: var(--line-strong);
+            color: var(--muted);
+            font-size: 0.88rem;
+            flex-direction: row; justify-content: space-between;
+        }
+
+        .summary-top { display: flex; justify-content: space-between; align-items: center; }
+        .summary-top .ch-name { font-size: 0.88rem; }
+
+        .summary-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .summary-stats .k { display: block; font-size: 0.72rem; color: var(--muted); }
+        .summary-stats .v { font-size: 0.86rem; font-weight: 600; }
+        .summary-stats .u { font-weight: 400; color: var(--muted); font-size: 0.75rem; }
+
+        /* ============================================================
+           RESPONSIVE
+           ============================================================ */
+        @media (max-width: 1200px) {
+            .layout { grid-template-columns: minmax(0, 1fr); padding: 20px 18px 32px; }
+            .sidebar { position: static; max-height: none; overflow: visible; }
+            .sidebar-scroll { overflow: visible; }
+            .sidebar-actions {
+                position: sticky; bottom: 0; z-index: 5;
+                border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+                box-shadow: 0 -8px 16px -12px rgba(18, 28, 43, 0.25);
+            }
+            .bottom-grid { grid-template-columns: minmax(0, 1fr); }
+        }
+
+        @media (max-width: 700px) {
+            .topbar { padding: 0 16px; }
+            .brand small { display: none; }
+            .layout { padding: 16px 12px 28px; gap: 16px; }
+            .main { gap: 16px; }
+            .form-grid { grid-template-columns: 1fr; }
+            .channel-grid { grid-template-columns: repeat(2, 1fr); }
+            .chart-wrap { height: 300px; }
+            .channel-cards { grid-template-columns: 1fr; }
+            .action-secondary { grid-template-columns: 1fr; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * { animation: none !important; transition: none !important; }
+        }
+    </style>
+</head>
+<body>
+<header class="topbar">
+    <div class="brand">
+        <div class="brand-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#7db4f5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4.5 17a8.5 8.5 0 1 1 15 0" />
+                <path d="M12 14.5 16 9" stroke="#ffffff" />
+                <circle cx="12" cy="15" r="1.4" fill="#ffffff" stroke="none" />
+            </svg>
+        </div>
+        <div>
+            <h1>Pressure Dashboard</h1>
+            <small>ABB RVG 200 — Multi-Channel Real-Time Monitoring</small>
+        </div>
+    </div>
+    <div class="status-pill" id="statusPill" role="status" aria-live="polite">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Idle</span>
+    </div>
+</header>
+
+<div class="layout">
+    <!-- ============================= SIDEBAR ============================= -->
+    <aside class="panel sidebar">
+        <div class="sidebar-head">
+            <h2>Test Configuration</h2>
+            <span class="count-chip" id="activeCount">0 channels</span>
+        </div>
+
+        <div class="sidebar-scroll">
+            <!-- CHANNEL SELECTION -->
+            <details class="section" open>
+                <summary>Active Channels</summary>
+                <div class="section-body">
+                    <div class="channel-grid" id="channelGrid">
+                        <!-- Rendered by JS -->
+                    </div>
+                    <div class="channel-tools">
+                        <button class="small-btn" id="selectAllBtn">Select All</button>
+                        <button class="small-btn" id="clearAllBtn">Clear All</button>
+                    </div>
+                </div>
+            </details>
+
+            <!-- TEST SETTINGS -->
+            <details class="section" open>
+                <summary>Test Settings</summary>
+                <div class="section-body">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="unit">Engineering Unit</label>
+                            <select id="unit">
+                                <option value="psi" selected>psi</option>
+                                <option value="bar">bar</option>
+                                <option value="kPa">kPa</option>
+                                <option value="MPa">MPa</option>
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label for="testMedium">Test Medium</label>
+                            <select id="testMedium">
+                                <option>Air</option>
+                                <option>Nitrogen</option>
+                                <option>Water</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label for="testDuration">Test Duration (min)</label>
+                            <input id="testDuration" type="number" min="1" step="1" value="1" />
+                        </div>
+
+                        <div class="field">
+                            <label for="sampleInterval">Sample Interval (sec)</label>
+                            <input id="sampleInterval" type="number" min="0.5" step="0.5" value="1" />
+                        </div>
+
+                        <div class="field full">
+                            <label for="maxDrop">Maximum Allowable Pressure Drop</label>
+                            <input id="maxDrop" type="number" step="0.01" value="2.5" />
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- INPUT RATINGS -->
+            <details class="section" open>
+                <summary>Input Full-Scale Rating</summary>
+                <div class="section-body">
+                    <div id="ratingContainer">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+            </details>
+
+            <!-- UUT / CUSTOMER -->
+            <details class="section" open>
+                <summary>Job &amp; Customer Details</summary>
+                <div class="section-body">
+                    <div class="form-grid">
+
+                        <div class="field">
+                            <label for="customerName">Customer Name</label>
+                            <input id="customerName" type="text" />
+                        </div>
+
+                        <div class="field">
+                            <label for="workOrder">Work Order</label>
+                            <input id="workOrder" type="text"  />
+                        </div>
+
+                        <div class="field">
+                            <label for="operatorName">Technician</label>
+                            <input id="operatorName" type="text"  />
+                        </div>
+
+                        <div class="field">
+                            <label for="testDate">Date of Test</label>
+                            <input id="testDate" type="date" />
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- WEATHERFORD-STYLE FIELDS -->
+            <details class="section" open>
+                <summary>Report Details</summary>
+                <div class="section-body">
+                    <div class="form-grid">
+                        <div class="field full">
+                            <label for="tools">Tools</label>
+                            <input id="tools" type="text" />
+                        </div>
+
+                        <div class="field full">
+                            <label for="description">Description</label>
+                            <input id="description" type="text" value="TEST PORT-1 CH-1 / TEST PORT-3 CH-2" />
+                        </div>
+
+                        <div class="field">
+                            <label for="jde">JDE</label>
+                            <input id="jde" type="text" value="2867002" />
+                        </div>
+
+                        <div class="field">
+                            <label for="documents">Documents</label>
+                            <input id="documents" type="text" value="D001130925" />
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <!-- ACTIONS (always visible) -->
+        <div class="sidebar-actions">
+            <div class="action-main">
+                <button class="primary" id="startBtn">Start Test</button>
+                <button class="danger" id="stopBtn" disabled>Stop Test</button>
+            </div>
+            <div class="action-secondary">
+                <button class="secondary" id="importBtn">Import CSV</button>
+                <button class="secondary" id="exportBtn">Export CSV</button>
+                <button class="secondary" id="reportBtn">Open Report</button>
+            </div>
+            <input type="file" id="csvFileInput" accept=".csv" style="display:none;" />
+        </div>
+    </aside>
+
+    <!-- ============================= MAIN ============================= -->
+    <main class="main">
+
+        <!-- LIVE CHANNEL CARDS -->
+        <section>
+            <div class="section-label">
+                <h2>Live Readings</h2>
+            </div>
+            <div class="channel-cards" id="channelCards">
+                <div class="empty-state">
+                    <div class="icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+                    </div>
+                    <div>
+                        <strong>No test running</strong>
+                        <span>Select one or more channels and click <b>Start Test</b> to begin monitoring.</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CHART -->
+        <section class="panel chart-panel">
+            <div class="panel-header">
+                <h2>Pressure vs Time</h2>
+                <span class="meta-chip" id="chartUnitLabel">psi</span>
+            </div>
+            <div class="chart-wrap">
+                <canvas id="pressureChart"></canvas>
+            </div>
+        </section>
+
+        <!-- BOTTOM: LOG + SUMMARY -->
+        <section class="bottom-grid">
+            <div class="panel table-panel">
+                <div class="panel-header">
+                    <h2>Logged Data</h2>
+                    <span class="meta-chip" id="rowCount">0 rows</span>
+                </div>
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Elapsed</th>
+                                <th>Channel</th>
+                                <th class="num">Pressure</th>
+                                <th>Unit</th>
+                                <th class="num">Drop</th>
+                                <th>Result</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel summary-panel">
+                <div class="panel-header">
+                    <h2>Per-Channel Summary</h2>
+                </div>
+                <ul class="summary-list" id="channelSummaryList">
+                    <li class="summary-empty"><strong>No active channels</strong><span>--</span></li>
+                </ul>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const TOTAL_CHANNELS = 6;
+const CHANNEL_COLORS = [
+    '#d97706', // CH-1 amber
+    '#2563eb', // CH-2 blue
+    '#16a34a', // CH-3 green
+    '#dc2626', // CH-4 red
+    '#7c3aed', // CH-5 purple
+    '#0891b2', // CH-6 cyan
+];
+
+/* ============================================================
+   DOM REFS
+   ============================================================ */
+const statusText       = document.getElementById('statusText');
+const statusDot        = document.getElementById('statusDot');
+const statusPill       = document.getElementById('statusPill');
+const channelGrid      = document.getElementById('channelGrid');
+const ratingContainer  = document.getElementById('ratingContainer');
+const channelCards     = document.getElementById('channelCards');
+const logTableBody     = document.getElementById('logTableBody');
+const rowCount         = document.getElementById('rowCount');
+const activeCount      = document.getElementById('activeCount');
+const chartUnitLabel   = document.getElementById('chartUnitLabel');
+const summaryList      = document.getElementById('channelSummaryList');
+const startBtn         = document.getElementById('startBtn');
+const stopBtn          = document.getElementById('stopBtn');
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let selectedChannels = new Set([1]); // default: Ch1 selected
+let isRunning = false;
+
+/* Display helpers (presentation only) */
+const fmt2 = v => (v !== null && v !== undefined) ? Number(v).toFixed(2) : '--';
+const chColor = ch => CHANNEL_COLORS[(ch - 1) % CHANNEL_COLORS.length];
+
+const EMPTY_CARD_HTML = `
+    <div class="empty-state">
+        <div class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+        </div>
+        <div>
+            <strong>No test running</strong>
+            <span>Select one or more channels and click <b>Start Test</b> to begin monitoring.</span>
+        </div>
+    </div>`;
+
+/* ============================================================
+   CHANNEL SELECTOR
+   ============================================================ */
+function renderChannelGrid() {
+    channelGrid.innerHTML = '';
+    for (let ch = 1; ch <= TOTAL_CHANNELS; ch++) {
+        const chip = document.createElement('label');
+        chip.className = 'channel-chip' + (selectedChannels.has(ch) ? ' active' : '');
+        chip.dataset.ch = ch;
+        chip.style.setProperty('--c', chColor(ch));
+        chip.innerHTML = `
+            <span class="ch-dot"></span>
+            <span>CH-${ch}</span>
+            <input type="checkbox" ${selectedChannels.has(ch) ? 'checked' : ''}>
+        `;
+        chip.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (isRunning) return;
+            if (selectedChannels.has(ch)) {
+                selectedChannels.delete(ch);
+            } else {
+                selectedChannels.add(ch);
+            }
+            renderChannelGrid();
+            renderRatingInputs();
+            updateActiveCount();
+        });
+        channelGrid.appendChild(chip);
+    }
+}
+
+function updateActiveCount() {
+    activeCount.textContent = `${selectedChannels.size} channel${selectedChannels.size === 1 ? '' : 's'}`;
+}
+
+/* ============================================================
+   INPUT RATING INPUTS
+   ============================================================ */
+function renderRatingInputs() {
+    ratingContainer.innerHTML = '';
+    const sorted = [...selectedChannels].sort((a, b) => a - b);
+    if (!sorted.length) {
+        ratingContainer.innerHTML =
+            '<div class="hint">Select at least one channel.</div>';
+        return;
+    }
+    sorted.forEach(ch => {
+        const row = document.createElement('div');
+        row.className = 'rating-row';
+        row.style.setProperty('--c', chColor(ch));
+        row.innerHTML = `
+            <label for="rating_${ch}">CH-${ch}</label>
+            <input type="text" id="rating_${ch}" value="20K" placeholder="e.g. 20K" />
+        `;
+        ratingContainer.appendChild(row);
+    });
+}
+
+/* ============================================================
+   CHART
+   ============================================================ */
+Chart.defaults.font.family = '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+Chart.defaults.color = '#66758a';
+
+const chart = new Chart(document.getElementById('pressureChart'), {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top',
+                align: 'end',
+                labels: {
+                    usePointStyle: true,
+                    pointStyle: 'rectRounded',
+                    boxWidth: 10,
+                    boxHeight: 10,
+                    padding: 22,
+                    font: { size: 12, weight: '500' },
+                    color: '#3b4859'
+                }
+            },
+            tooltip: {
+                backgroundColor: '#0f1b2d',
+                titleColor: '#ffffff',
+                bodyColor: '#d5deec',
+                padding: 10,
+                cornerRadius: 8,
+                boxPadding: 4
+            }
+        },
+        scales: {
+            x: {
+                ticks: { autoSkip: true, maxTicksLimit: 10, color: '#66758a', font: { size: 11 } },
+                grid: { display: false },
+                border: { color: '#c6cfdb' },
+                title: { display: true, text: 'Elapsed Time', color: '#66758a', font: { size: 11, weight: '500' } }
+            },
+            y: {
+                beginAtZero: false,
+                ticks: { color: '#66758a', font: { size: 11 } },
+                grid: { color: '#e6ebf1' },
+                border: { display: false },
+                title: { display: true, text: 'Pressure (psi)', color: '#66758a', font: { size: 11, weight: '500' } }
+            }
+        }
+    }
+});
+
+/* ============================================================
+   STATUS + RESULT
+   ============================================================ */
+function setStatus(status, running) {
+    statusText.textContent = status;
+    statusPill.classList.toggle('is-running', Boolean(running));
+}
+
+function resultClass(result) {
+    if (result === 'PASS') return 'result-pass';
+    if (result === 'FAIL') return 'result-fail';
+    if (result === 'ERR' || result === 'ERROR') return 'result-err';
+    return 'result-pending';
+}
+
+/* ============================================================
+   RENDER LIVE CHANNEL CARDS
+   ============================================================ */
+function renderChannelCards(data) {
+    const channels = data.channels || [];
+    const channelData = data.channel_data || {};
+    const unit = data.session_data?.unit || 'psi';
+
+    if (!channels.length) {
+        channelCards.innerHTML = EMPTY_CARD_HTML;
+        return;
+    }
+
+    channelCards.innerHTML = channels.map(ch => {
+        const key = String(ch);
+        const slot = channelData[key] || {};
+        const current = slot.current_pressure;
+        const drop = slot.pressure_drop;
+        const result = slot.result || 'Pending';
+        const color = chColor(ch);
+
+        return `
+            <div class="ch-card" style="--c:${color};">
+                <div class="ch-card-header">
+                    <span class="ch-name">CH-${ch}</span>
+                    <span class="result-badge ${resultClass(result)}">${result}</span>
+                </div>
+                <div class="metric-label">Current pressure</div>
+                <div class="metric-value">
+                    ${fmt2(current)}
+                    <span class="metric-unit">${unit}</span>
+                </div>
+                <div class="ch-footer">
+                    <div><span class="k">Drop</span><span class="v">${fmt2(drop)} ${unit}</span></div>
+                    <div><span class="k">Start</span><span class="v">${fmt2(slot.start_pressure)} ${unit}</span></div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+/* ============================================================
+   RENDER CHART
+   ============================================================ */
+function renderChart(data) {
+    const channels = data.channels || [];
+    const channelData = data.channel_data || {};
+    const unit = data.session_data?.unit || 'psi';
+
+    chartUnitLabel.textContent = unit;
+    chart.options.scales.y.title.text = `Pressure (${unit})`;
+
+    // Build a common time axis from the longest channel
+    let labels = [];
+    let maxLen = 0;
+    channels.forEach(ch => {
+        const hist = channelData[String(ch)]?.history || [];
+        if (hist.length > maxLen) {
+            maxLen = hist.length;
+            labels = hist.map(s => s.elapsed_time);
+        }
+    });
+
+    const datasets = channels.map((ch, idx) => {
+        const hist = channelData[String(ch)]?.history || [];
+        return {
+            label: `CH-${ch}`,
+            data: hist.map(s => s.pressure),
+            borderColor: CHANNEL_COLORS[(ch - 1) % CHANNEL_COLORS.length],
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: 0,
+            spanGaps: true,
+        };
+    });
+
+    chart.data.labels = labels;
+    chart.data.datasets = datasets;
+    chart.update('none');
+}
+
+/* ============================================================
+   RENDER LOG TABLE
+   ============================================================ */
+function renderTable(history) {
+    if (!history || !history.length) {
+        logTableBody.innerHTML =
+            '<tr><td colspan="7" class="table-empty">No data logged yet.</td></tr>';
+        rowCount.textContent = '0 rows';
+        return;
+    }
+
+    rowCount.textContent = `${history.length} rows`;
+
+    const rows = history.slice(-200).reverse().map(row => {
+        const color = chColor(row.channel || 1);
+        return `
+            <tr>
+                <td>${row.timestamp || ''}</td>
+                <td>${row.elapsed_time || ''}</td>
+                <td><span class="ch-tag" style="--c:${color};">CH-${row.channel || '?'}</span></td>
+                <td class="num">${row.pressure !== undefined ? Number(row.pressure).toFixed(2) : ''}</td>
+                <td>${row.unit || ''}</td>
+                <td class="num">${row.pressure_drop !== undefined ? Number(row.pressure_drop).toFixed(2) : ''}</td>
+                <td><span class="result-badge ${resultClass(row.result)}">${row.result || 'Pending'}</span></td>
+            </tr>`;
+    }).join('');
+
+    logTableBody.innerHTML = rows;
+}
+
+/* ============================================================
+   RENDER SUMMARY
+   ============================================================ */
+function renderSummary(data) {
+    const channels = data.channels || [];
+    const channelData = data.channel_data || {};
+    const unit = data.session_data?.unit || 'psi';
+
+    if (!channels.length) {
+        summaryList.innerHTML =
+            '<li class="summary-empty"><strong>No active channels</strong><span>--</span></li>';
+        return;
+    }
+
+    summaryList.innerHTML = channels.map(ch => {
+        const slot = channelData[String(ch)] || {};
+        const start = slot.start_pressure;
+        const end = slot.end_pressure;
+        const drop = slot.pressure_drop;
+        const result = slot.result || 'Pending';
+        return `
+            <li style="--c:${chColor(ch)};">
+                <div class="summary-top">
+                    <span class="ch-name">CH-${ch}</span>
+                    <span class="result-badge ${resultClass(result)}">${result}</span>
+                </div>
+                <div class="summary-stats">
+                    <div><span class="k">Start</span><span class="v">${fmt2(start)} <span class="u">${unit}</span></span></div>
+                    <div><span class="k">End</span><span class="v">${fmt2(end)} <span class="u">${unit}</span></span></div>
+                    <div><span class="k">Drop</span><span class="v">${fmt2(drop)} <span class="u">${unit}</span></span></div>
+                </div>
+            </li>
+        `;
+    }).join('');
+}
+
+/* ============================================================
+   POLL STATE
+   ============================================================ */
+async function fetchState() {
+    try {
+        const res = await fetch('/api/state');
+        const data = await res.json();
+        if (!data) return;
+
+        isRunning = Boolean(data.running);
+        startBtn.disabled = isRunning;
+        stopBtn.disabled = !isRunning;
+
+        setStatus(data.status || 'Idle', isRunning);
+
+        renderChannelCards(data);
+        renderChart(data);
+        renderTable(data.history || []);
+        renderSummary(data);
+
+        if (data.last_error) {
+            console.error('[Backend]', data.last_error);
+        }
+    } catch (err) {
+        console.error('fetchState failed:', err);
+    }
+}
+
+/* ============================================================
+   START / STOP
+   ============================================================ */
+async function startTest() {
+    if (selectedChannels.size === 0) {
+        alert('Please select at least one channel.');
+        return;
+    }
+
+    const channels = [...selectedChannels].sort((a, b) => a - b);
+
+    const inputRatings = {};
+    channels.forEach(ch => {
+        const el = document.getElementById(`rating_${ch}`);
+        inputRatings[String(ch)] = el ? el.value.trim() || '20K' : '20K';
+    });
+
+    const payload = {
+        channels: channels,
+        input_ratings: inputRatings,
+
+        unit: document.getElementById('unit').value,
+        test_medium: document.getElementById('testMedium').value,
+        test_duration_minutes: Number(document.getElementById('testDuration').value || 0),
+        sample_interval: Number(document.getElementById('sampleInterval').value || 1),
+        max_allowable_pressure_drop: Number(document.getElementById('maxDrop').value || 0),
+
+        customer_name: document.getElementById('customerName').value,
+        work_order: document.getElementById('workOrder').value,
+        operator_name: document.getElementById('operatorName').value,
+        test_date: document.getElementById('testDate').value || new Date().toISOString().slice(0, 10),
+
+        // Weatherford fields
+        tools: document.getElementById('tools').value,
+        description: document.getElementById('description').value,
+        jde: document.getElementById('jde').value,
+        documents: document.getElementById('documents').value,
+    };
+
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+
+    try {
+        const res = await fetch('/api/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.error) {
+            alert(data.error);
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            return;
+        }
+        await fetchState();
+    } catch (err) {
+        alert('Failed to start test: ' + err.message);
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+    }
+}
+
+async function stopTest() {
+    stopBtn.disabled = true;
+    try {
+        await fetch('/api/stop', { method: 'POST' });
+        await fetchState();
+    } catch (err) {
+        alert('Failed to stop test: ' + err.message);
+    }
+    stopBtn.disabled = false;
+}
+
+/* ============================================================
+   IMPORT / EXPORT / REPORT
+   ============================================================ */
+function importCsv() {
+    document.getElementById('csvFileInput').click();
+}
+
+document.getElementById('csvFileInput').addEventListener('change', async function () {
+    const file = this.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const res = await fetch('/api/import_csv', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+            alert(data.error || 'Failed to import CSV.');
+            return;
+        }
+        alert(`CSV imported successfully. ${data.count} records loaded.`);
+        await fetchState();
+    } catch (err) {
+        alert('Failed to import CSV: ' + err.message);
+    }
+    this.value = '';
+});
+
+function exportCsv() {
+    window.location.href = '/api/export_csv';
+}
+
+async function openReport() {
+    try {
+        const res = await fetch('/api/report');
+        const data = await res.json();
+        if (data.report_url) {
+            window.open(data.report_url, '_blank');
+        } else if (data.error) {
+            alert(data.error);
+        }
+    } catch (err) {
+        alert('Failed to open report: ' + err.message);
+    }
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+document.getElementById('selectAllBtn').addEventListener('click', () => {
+    if (isRunning) return;
+    selectedChannels = new Set(Array.from({ length: TOTAL_CHANNELS }, (_, i) => i + 1));
+    renderChannelGrid();
+    renderRatingInputs();
+    updateActiveCount();
+});
+
+document.getElementById('clearAllBtn').addEventListener('click', () => {
+    if (isRunning) return;
+    selectedChannels.clear();
+    renderChannelGrid();
+    renderRatingInputs();
+    updateActiveCount();
+});
+
+startBtn.addEventListener('click', startTest);
+stopBtn.addEventListener('click', stopTest);
+document.getElementById('importBtn').addEventListener('click', importCsv);
+document.getElementById('exportBtn').addEventListener('click', exportCsv);
+document.getElementById('reportBtn').addEventListener('click', openReport);
+
+document.getElementById('testDate').value = new Date().toISOString().slice(0, 10);
+
+renderChannelGrid();
+renderRatingInputs();
+updateActiveCount();
+
+fetchState();
+setInterval(fetchState, 1000);
+</script>
+</body>
+</html>

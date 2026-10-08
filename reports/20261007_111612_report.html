@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Pressure Test Report - 20261007_111612</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    * { box-sizing: border-box; }
+    html, body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        background: #fff;
+        color: #000;
+    }
+    .report {
+        max-width: 1180px;
+        margin: 20px auto;
+        border: 1.5px solid #1f2937;
+        background: #fff;
+        font-size: 12px;
+    }
+
+    /* ================= HEADER (chart-left / tests-right) ================= */
+    .main {
+        display: grid;
+        grid-template-columns: 1.75fr 1fr;
+        min-height: 480px;
+        border-bottom: 1.5px solid #1f2937;
+    }
+
+    .chart-pane {
+        padding: 12px 14px;
+        border-right: 1.5px solid #1f2937;
+        position: relative;
+    }
+    .chart-pane .axis-label {
+        position: absolute;
+        top: 8px;
+        left: 14px;
+        font-size: 11px;
+        color: #374151;
+    }
+    .chart-wrap {
+        position: relative;
+        height: 440px;
+        width: 100%;
+    }
+
+    /* ================= TEST BLOCKS (right side) ================= */
+    .tests-pane {
+        padding: 10px 14px;
+        overflow: hidden;
+    }
+
+    .test-block {
+        padding: 8px 0 14px;
+        border-bottom: 1px dashed #cbd5e1;
+    }
+    .test-block:last-child { border-bottom: none; }
+
+    .test-title {
+        font-weight: 700;
+        font-size: 13px;
+        margin-bottom: 6px;
+    }
+    .test-title .pass { color: #047857; font-weight: 700; }
+    .test-title .fail { color: #b91c1c; font-weight: 700; }
+
+    table.kv {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+    }
+    table.kv td {
+        padding: 2px 4px;
+        vertical-align: top;
+    }
+    table.kv td.k {
+        color: #374151;
+        white-space: nowrap;
+        padding-right: 10px;
+        width: 1%;
+    }
+    table.kv td.v {
+        text-align: left;
+    }
+
+    /* ================= FOOTER (branding + signature) ================= */
+    .footer {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        font-size: 12px;
+    }
+
+    .footer-left {
+        padding: 14px 18px;
+        border-right: 1.5px solid #1f2937;
+        display: flex;
+        gap: 16px;
+    }
+    .wf-logo {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        min-width: 200px;
+    }
+    .wf-logo .mark {
+        width: 42px;
+        height: 42px;
+        margin-bottom: 4px;
+    }
+    .wf-logo .name {
+        font-size: 24px;
+        font-weight: 900;
+        letter-spacing: -0.5px;
+        color: #000;
+        line-height: 1;
+    }
+    .wf-logo .addr {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #374151;
+        line-height: 1.35;
+    }
+    .wf-logo .version {
+        margin-top: 24px;
+        font-size: 9px;
+        color: #6b7280;
+    }
+
+    .footer-left .fields {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+    }
+    .footer-left .fields .row {
+        display: flex;
+        gap: 8px;
+    }
+    .footer-left .fields .row .k {
+        color: #374151;
+        min-width: 80px;
+    }
+    .footer-left .fields .row .v {
+        font-weight: 600;
+    }
+
+    .footer-right {
+        padding: 14px 18px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .footer-right .fields {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+    }
+    .footer-right .fields .row {
+        display: flex;
+        gap: 8px;
+    }
+    .footer-right .fields .row .k {
+        color: #374151;
+        min-width: 80px;
+    }
+    .footer-right .fields .row .v { font-weight: 600; }
+
+    .signature {
+        margin-top: 18px;
+        font-size: 12px;
+    }
+    .signature .label { color: #374151; }
+    .signature .line {
+        display: inline-block;
+        border-bottom: 1px solid #1f2937;
+        min-width: 180px;
+        margin-left: 6px;
+        vertical-align: bottom;
+    }
+
+    .footer-bottom {
+        grid-column: 1 / -1;
+        border-top: 1.5px solid #1f2937;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 9px;
+        color: #6b7280;
+        padding: 5px 10px;
+    }
+
+    .remarks {
+        padding: 10px 18px;
+        font-size: 11.5px;
+        color: #374151;
+        border-top: 1px solid #e5e7eb;
+        background: #fafbfc;
+    }
+
+    @media print {
+        body { margin: 0; }
+        .report { margin: 0; border-width: 1px; }
+    }
+</style>
+</head>
+<body>
+<div class="report">
+
+    <!-- ============ MAIN: chart + test blocks ============ -->
+    <div class="main">
+
+        <div class="chart-pane">
+            <div class="chart-wrap">
+                <canvas id="pressureChart"></canvas>
+            </div>
+        </div>
+
+        <div class="tests-pane">
+            
+        <div class="test-block">
+            <div class="test-title">
+                Test 1 &hellip; <span class="pass">PASS</span>
+            </div>
+            <table class="kv">
+                <tr><td class="k">Input</td><td class="v">20K</td></tr>
+                <tr><td class="k">Start</td><td class="v">11:16:14 (+0.03 m)</td></tr>
+                <tr><td class="k">End</td><td class="v">11:16:20 (+0.13 m)</td></tr>
+                <tr><td class="k">Test duration</td><td class="v">0:15:00</td></tr>
+                <tr><td class="k">Start value</td><td class="v">6959.86 psi</td></tr>
+                <tr><td class="k">End value</td><td class="v">6959.48 psi</td></tr>
+                <tr><td class="k">Max. error</td><td class="v">0.38 psi</td></tr>
+                <tr><td class="k">Relative error</td><td class="v">&plusmn;0.01 %</td></tr>
+            </table>
+        </div>
+        
+
+        <div class="test-block">
+            <div class="test-title">
+                Test 2 &hellip; <span class="pass">PASS</span>
+            </div>
+            <table class="kv">
+                <tr><td class="k">Input</td><td class="v">20K</td></tr>
+                <tr><td class="k">Start</td><td class="v">11:16:14 (+0.03 m)</td></tr>
+                <tr><td class="k">End</td><td class="v">11:16:20 (+0.13 m)</td></tr>
+                <tr><td class="k">Test duration</td><td class="v">0:15:00</td></tr>
+                <tr><td class="k">Start value</td><td class="v">6155.87 psi</td></tr>
+                <tr><td class="k">End value</td><td class="v">6155.94 psi</td></tr>
+                <tr><td class="k">Max. error</td><td class="v">0.15 psi</td></tr>
+                <tr><td class="k">Relative error</td><td class="v">&plusmn;0.00 %</td></tr>
+            </table>
+        </div>
+        
+        </div>
+    </div>
+
+    <!-- ============ FOOTER: branding + signature ============ -->
+    <div class="footer">
+
+        <div class="footer-left">
+            <div class="wf-logo">
+                <svg class="mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M50 90 L10 35 Q5 28 12 25 L50 15 L88 25 Q95 28 90 35 Z"
+                          fill="#c8102e"/>
+                    <path d="M50 90 L30 50 L50 55 L70 50 Z" fill="#fff" opacity="0.9"/>
+                </svg>
+                <div class="name">Weatherford</div>
+                <div class="addr">
+                    Weatherford<br/>
+                    Abu Dhabi<br/>
+                    UAE
+                </div>
+                <div class="version">2.11.1.2 (Build 75)</div>
+            </div>
+
+            <div class="fields">
+                <div class="row"><span class="k">Customer</span><span class="v">:&nbsp;BEKOK RIV</span></div>
+                <div class="row"><span class="k">Work Order</span><span class="v">:&nbsp;10482051</span></div>
+                <div class="row"><span class="k">Tools</span><span class="v">:&nbsp;VALVE, RESERVOIR ISOLATION</span></div>
+                <div class="row"><span class="k">Description</span><span class="v">:&nbsp;TEST PORT-1 CH-1 / TEST PORT-3 CH-2</span></div>
+            </div>
+        </div>
+
+        <div class="footer-right">
+            <div class="fields">
+                <div class="row"><span class="k">JDE</span><span class="v">:&nbsp;2867002</span></div>
+                <div class="row"><span class="k">Documents</span><span class="v">:&nbsp;D001130925</span></div>
+                <div class="row"><span class="k">Technician</span><span class="v">:&nbsp;YASIR SHAH</span></div>
+                <div class="row"><span class="k">Recorded on</span><span class="v">:&nbsp;11:16:23 07/10/2026</span></div>
+            </div>
+            <div class="signature">
+                <span class="label">Signature :</span><span class="line"></span>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <span>000012 10482051-VALVE_RESERVOIR-ISOLATION.01</span>
+            <span style="font-weight:700;font-style:italic;color:#0ea5e9;">EZL</span>
+        </div>
+    </div>
+
+    <div class="remarks">
+        <strong>Remarks:</strong> 
+    </div>
+</div>
+
+<script>
+const labels   = ["0:00:02", "0:00:04", "0:00:06", "0:00:08"];
+const datasets = [{"label": "CH-1", "data": [6959.86, 6959.64, 6959.56, 6959.48], "borderColor": "#d97706", "backgroundColor": "transparent", "borderWidth": 2, "pointRadius": 0, "tension": 0.2, "spanGaps": true}, {"label": "CH-3", "data": [6155.87, 6155.94, 6156.02, 6155.94], "borderColor": "#16a34a", "backgroundColor": "transparent", "borderWidth": 2, "pointRadius": 0, "tension": 0.2, "spanGaps": true}];
+
+/* Highlight the last data point on each dataset (like the reference) */
+datasets.forEach(ds => {
+    if (!ds.data || !ds.data.length) return;
+    const lastIdx = ds.data.length - 1;
+    ds.pointRadius = ds.data.map((_, i) => i === lastIdx ? 4 : 0);
+    ds.pointBackgroundColor = ds.borderColor;
+    ds.pointBorderColor = '#fff';
+    ds.pointBorderWidth = 1.5;
+});
+
+new Chart(document.getElementById('pressureChart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top',
+                align: 'start',
+                labels: {
+                    boxWidth: 22,
+                    boxHeight: 2,
+                    usePointStyle: true,
+                    pointStyle: 'line',
+                    font: { size: 11 },
+                    padding: 12
+                }
+            },
+            tooltip: { enabled: true }
+        },
+        scales: {
+            x: {
+                grid: { color: '#e5e7eb', drawTicks: true },
+                ticks: {
+                    color: '#374151',
+                    font: { size: 10 },
+                    maxTicksLimit: 8,
+                    callback: function(v, i) {
+                        return this.getLabelForValue(v).replace(':', 'm ').replace(/^00m/, '0s');
+                    }
+                },
+                border: { color: '#1f2937' }
+            },
+            y: {
+                beginAtZero: true,
+                suggestedMax: 15000,
+                grid: { color: '#e5e7eb' },
+                ticks: { color: '#374151', font: { size: 10 }, stepSize: 3000 },
+                border: { color: '#1f2937' }
+            }
+        }
+    }
+});
+</script>
+</body>
+</html>

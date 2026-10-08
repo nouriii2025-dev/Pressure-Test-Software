@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Pressure Test Report - 20261007_110632</title>
+<style>
+@page { size: A4 landscape; margin: 8mm; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #fff; color: #000;
+  font-family: Tahoma, Verdana, 'Segoe UI', Arial, sans-serif;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { padding: 16px 0; }
+.report { width: 1050px; margin: 0 auto; border: 1.4px solid #1a1a1a; background: #fff; }
+
+.main { display: grid; grid-template-columns: 745px 1fr; height: 493px; border-bottom: 1.4px solid #1a1a1a; }
+.main.many { grid-template-columns: 1fr 400px; }
+.chart-pane { overflow: hidden; }
+.chart { width: 100%; height: auto; display: block; }
+.tests-pane { border-left: 1.8px solid #1a1a1a; padding: 22px 12px 8px 12px; overflow: hidden; }
+.many .tests-pane { column-count: 2; column-gap: 14px; padding-top: 14px; }
+.tb { margin-bottom: 26px; break-inside: avoid; }
+.many .tb { margin-bottom: 14px; }
+.tt { font-size: 12.5px; line-height: 16px; margin-bottom: 9px; }
+.kv { border-collapse: collapse; font-size: 11px; line-height: 13.2px; }
+.kv td { padding: 0; vertical-align: top; white-space: nowrap; }
+.kv td.k { width: 104px; }
+.many .kv td.k { width: 82px; }
+.many .kv { font-size: 10px; line-height: 12px; }
+
+.footer { position: relative; display: grid; grid-template-columns: 246px 379px 1fr;
+  height: 186px; padding: 15px 10px 0 6px; font-size: 11.5px; }
+.brand img { width: 204px; height: auto; display: block; }
+.addr { margin-top: 6px; font-size: 11px; line-height: 13px; color: #555; }
+.f { border-collapse: collapse; align-self: start; margin-top: 5px; width: 100%; }
+.f td { height: 22px; padding: 0; vertical-align: bottom; }
+.f td.k { width: 92px; text-align: right; padding-right: 0; white-space: nowrap; }
+.f td.v { padding-left: 8px; border-bottom: 1px solid #333; }
+.f tr.noline td.v { border-bottom: none; vertical-align: top; padding-top: 3px; line-height: 13px; }
+.f tr.desc td.k { vertical-align: top; padding-top: 3px; }
+.f tr.sp td { height: 46px; border: none; }
+.f tr.sig td.v { border-bottom: none; }
+.fbottom { position: absolute; left: 10px; right: 10px; bottom: 4px; display: flex;
+  justify-content: space-between; align-items: flex-end; font-size: 7.5px; color: #555; }
+.ez { font-weight: 800; font-style: italic; font-size: 11px; color: #1b62b0; letter-spacing: -0.3px;
+  border-bottom: 2px solid #1b62b0; margin-left: 5px; line-height: 1; }
+.fbr { display: flex; align-items: flex-end; }
+.remarks { width: 1050px; margin: 6px auto 0; font-size: 10.5px; color: #333; }
+@media print { body { padding: 0; } .report { margin: 0 auto; } }
+</style></head>
+<body>
+<div class="report">
+  <div class="main">
+    <div class="chart-pane"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 745 493" class="chart" font-family="Tahoma, Verdana, Arial, sans-serif">
+<line x1="82.0" y1="30" x2="82.0" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="124.7" y1="30" x2="124.7" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="167.3" y1="30" x2="167.3" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="210.0" y1="30" x2="210.0" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="252.7" y1="30" x2="252.7" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="295.3" y1="30" x2="295.3" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="338.0" y1="30" x2="338.0" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="380.7" y1="30" x2="380.7" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="423.3" y1="30" x2="423.3" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="466.0" y1="30" x2="466.0" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="508.7" y1="30" x2="508.7" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="551.3" y1="30" x2="551.3" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="594.0" y1="30" x2="594.0" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="636.7" y1="30" x2="636.7" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="679.3" y1="30" x2="679.3" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="722.0" y1="30" x2="722.0" y2="459" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="459.0" x2="722" y2="459.0" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="441.8" x2="722" y2="441.8" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="424.7" x2="722" y2="424.7" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="407.5" x2="722" y2="407.5" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="390.4" x2="722" y2="390.4" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="373.2" x2="722" y2="373.2" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="356.0" x2="722" y2="356.0" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="338.9" x2="722" y2="338.9" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="321.7" x2="722" y2="321.7" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="304.6" x2="722" y2="304.6" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="287.4" x2="722" y2="287.4" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="270.2" x2="722" y2="270.2" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="253.1" x2="722" y2="253.1" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="235.9" x2="722" y2="235.9" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="218.8" x2="722" y2="218.8" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="201.6" x2="722" y2="201.6" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="184.4" x2="722" y2="184.4" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="167.3" x2="722" y2="167.3" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="150.1" x2="722" y2="150.1" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="133.0" x2="722" y2="133.0" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="115.8" x2="722" y2="115.8" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="98.6" x2="722" y2="98.6" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="81.5" x2="722" y2="81.5" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="64.3" x2="722" y2="64.3" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="47.2" x2="722" y2="47.2" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82" y1="30.0" x2="722" y2="30.0" stroke="#dcdcdc" stroke-width="0.6"/>
+<line x1="82.0" y1="30" x2="82.0" y2="459" stroke="#b9b9b9" stroke-width="0.8"/>
+<text x="82.0" y="474" font-size="10.5" fill="#222" text-anchor="middle">0s</text>
+<line x1="295.3" y1="30" x2="295.3" y2="459" stroke="#b9b9b9" stroke-width="0.8"/>
+<text x="295.3" y="474" font-size="10.5" fill="#222" text-anchor="middle">10s</text>
+<line x1="508.7" y1="30" x2="508.7" y2="459" stroke="#b9b9b9" stroke-width="0.8"/>
+<text x="508.7" y="474" font-size="10.5" fill="#222" text-anchor="middle">20s</text>
+<line x1="722.0" y1="30" x2="722.0" y2="459" stroke="#b9b9b9" stroke-width="0.8"/>
+<text x="722.0" y="474" font-size="10.5" fill="#222" text-anchor="middle">30s</text>
+<line x1="82" y1="459.0" x2="722" y2="459.0" stroke="#b9b9b9" stroke-width="0.8"/>
+<text x="76" y="462.5" font-size="10.5" fill="#222" text-anchor="end">0</text>
+<line x1="82" y1="373.2" x2="722" y2="373.2" stroke="#b9b9b9" stroke-width="0.8"/>
+<text x="76" y="376.7" font-size="10.5" fill="#222" text-anchor="end">2000</text>
+<line x1="82" y1="287.4" x2="722" y2="287.4" stroke="#b9b9b9" stroke-width="0.8"/>
+<text x="76" y="290.9" font-size="10.5" fill="#222" text-anchor="end">4000</text>
+<line x1="82" y1="201.6" x2="722" y2="201.6" stroke="#b9b9b9" stroke-width="0.8"/>
+<text x="76" y="205.1" font-size="10.5" fill="#222" text-anchor="end">6000</text>
+<line x1="82" y1="115.8" x2="722" y2="115.8" stroke="#b9b9b9" stroke-width="0.8"/>
+<text x="76" y="119.3" font-size="10.5" fill="#222" text-anchor="end">8000</text>
+<line x1="82" y1="30.0" x2="722" y2="30.0" stroke="#b9b9b9" stroke-width="0.8"/>
+<text x="76" y="33.5" font-size="10.5" fill="#222" text-anchor="end">10000</text>
+<rect x="82" y="30" width="640" height="429" fill="none" stroke="#9a9a9a" stroke-width="0.8"/>
+<line x1="88" y1="19" x2="118" y2="19" stroke="#e0392b" stroke-width="2"/>
+<text x="124" y="23" font-size="11" fill="#333">20K</text>
+<polyline points="103.3,160.4 146.0,160.4 210.0,160.4 252.7,160.4 295.3,160.4 359.3,160.4 402.0,160.4 444.7,160.4 487.3,160.4 551.3,160.4 594.0,160.4 658.0,160.4" fill="none" stroke="#e0392b" stroke-width="1.7" stroke-linejoin="round"/>
+<line x1="103.3" y1="129.4" x2="103.3" y2="160.4" stroke="#e0392b" stroke-width="0.8"/>
+<rect x="84.0" y="115.4" width="67.0" height="14" fill="#fbf7ea" stroke="#e0392b" stroke-width="1"/>
+<text x="117.5" y="125.9" font-size="10" fill="#222" text-anchor="middle">6959.6 PSI</text>
+<rect x="100.3" y="157.4" width="6" height="6" fill="#e0392b"/>
+<line x1="658.0" y1="129.4" x2="658.0" y2="160.4" stroke="#e0392b" stroke-width="0.8"/>
+<rect x="624.5" y="115.4" width="67.0" height="14" fill="#fbf7ea" stroke="#e0392b" stroke-width="1"/>
+<text x="658.0" y="125.9" font-size="10" fill="#222" text-anchor="middle">6959.7 PSI</text>
+<rect x="655.0" y="157.4" width="6" height="6" fill="#e0392b"/>
+</svg></div>
+    <div class="tests-pane"><div class="tb"><div class="tt">Test 1 ... &nbsp;PASS</div><table class="kv"><tr><td class="k">Input</td><td class="v">20K</td></tr><tr><td class="k">Start</td><td class="v">11:06:33 AM (+0.02 m)</td></tr><tr><td class="k">End</td><td class="v">11:06:59 AM (+0.45 m)</td></tr><tr><td class="k">Test duration</td><td class="v">26 s</td></tr><tr><td class="k">Start value</td><td class="v">6959.6 PSI</td></tr><tr><td class="k">End value</td><td class="v">6959.7 PSI (+0.05)</td></tr><tr><td class="k">Max. error</td><td class="v">&plusmn;0.40 PSI</td></tr><tr><td class="k">Relative error</td><td class="v">&plusmn;0.01 %</td></tr></table></div></div>
+  </div>
+  <div class="footer">
+    <div class="brand">
+      <img src="data:image/png;base64,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" alt="Weatherford">
+      <div class="addr">Weatherford<br>Abu Dhabi<br>UAE</div>
+    </div>
+    <table class="f"><tr class=""><td class="k">Customer&nbsp;:</td><td class="v">Weatherford</td></tr><tr class=""><td class="k">Work Order&nbsp;:</td><td class="v">10482051</td></tr><tr class=""><td class="k">Tools&nbsp;:</td><td class="v">VALVE, RESERVOIR ISOLATION</td></tr><tr class="noline desc"><td class="k">Description&nbsp;:</td><td class="v">TEST PORT-1 CH-1 / TEST PORT-3 CH-2</td></tr></table>
+    <table class="f"><tr class=""><td class="k">JDE&nbsp;:</td><td class="v">2867002</td></tr><tr class=""><td class="k">Documents&nbsp;:</td><td class="v">D001130925</td></tr><tr class=""><td class="k">Technician&nbsp;:</td><td class="v">YASIR SHAH</td></tr><tr class=""><td class="k">Recorded on&nbsp;:</td><td class="v">11:08:36 07/10/2026</td></tr>
+      <tr class="sp"><td colspan="2"></td></tr>
+      <tr class="sig"><td class="k">Signature&nbsp;:</td><td class="v"></td></tr>
+    </table>
+    <div class="fbottom">
+      <span>2.11.1.0 (Build 79)</span>
+      <span class="fbr"><span>000053-10482051-VALVE-RESERVOIR-ISOLATION-01</span><span class="ez">EZTEK</span></span>
+    </div>
+  </div>
+</div>
+</body></html>

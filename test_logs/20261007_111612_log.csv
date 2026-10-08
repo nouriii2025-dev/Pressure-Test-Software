@@ -1,0 +1,9 @@
+Timestamp,Elapsed Time,Channel,Pressure,Unit,Test Status,Pressure Drop,Max Allowable Pressure Drop,Result,Medium
+2026-10-07 11:16:14,0:00:02,1,6959.86,psi,Running,0.0,2.5,Pending,Air
+2026-10-07 11:16:14,0:00:02,3,6155.87,psi,Running,0.0,2.5,Pending,Air
+2026-10-07 11:16:16,0:00:04,1,6959.64,psi,Running,0.22,2.5,Pending,Air
+2026-10-07 11:16:16,0:00:04,3,6155.94,psi,Running,-0.07,2.5,Pending,Air
+2026-10-07 11:16:18,0:00:06,1,6959.56,psi,Running,0.3,2.5,Pending,Air
+2026-10-07 11:16:18,0:00:06,3,6156.02,psi,Running,-0.15,2.5,Pending,Air
+2026-10-07 11:16:20,0:00:08,1,6959.48,psi,Running,0.38,2.5,Pending,Air
+2026-10-07 11:16:20,0:00:08,3,6155.94,psi,Running,-0.07,2.5,Pending,Air

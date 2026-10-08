@@ -1,0 +1,315 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+
+    <title>
+        Pressure Report - 20260912_013203
+    </title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            color: #1f2937;
+            background: #ffffff;
+        }
+
+        h1,
+        h2 {
+            color: #111827;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            padding: 16px;
+            background: #f9fafb;
+        }
+
+        .label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+        }
+
+        .value {
+            font-size: 18px;
+            font-weight: 600;
+            margin-top: 6px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 24px;
+        }
+
+        th,
+        td {
+            border: 1px solid #d1d5db;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background: #e5e7eb;
+        }
+
+        .pass {
+            color: #047857;
+            font-weight: 700;
+        }
+
+        .fail {
+            color: #b91c1c;
+            font-weight: 700;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            margin: 30px 0;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #pressureChart {
+            width: 100% !important;
+            height: 100% !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Pressure Report</h1>
+
+    <div class="grid">
+
+        <div class="card">
+            <div class="label">Session ID</div>
+            <div class="value">20260912_013203</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Status</div>
+            <div class="value">Completed</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Test Medium</div>
+            <div class="value">Air</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Unit</div>
+            <div class="value">psi</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Start Pressure</div>
+            <div class="value">22.13</div>
+        </div>
+
+        <div class="card">
+            <div class="label">End Pressure</div>
+            <div class="value">22.13</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Pressure Drop</div>
+            <div class="value">0.0</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Max Allowable Pressure Drop</div>
+            <div class="value">MAX_0.0</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Result</div>
+            <div class="value pass">PASS</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Duration</div>
+            <div class="value">0:00:20</div>
+        </div>
+
+    </div>
+
+
+    <h2>UUT and Customer Details</h2>
+
+    <div class="grid">
+
+        <div class="card">
+            <div class="label">UUT Name</div>
+            <div class="value">Valve Assembly</div>
+        </div>
+
+        <div class="card">
+            <div class="label">UUT Tag</div>
+            <div class="value">UUT-2048</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Model Number</div>
+            <div class="value">RVG-200</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Serial Number</div>
+            <div class="value">SN-7781</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Manufacturer</div>
+            <div class="value"></div>
+        </div>
+
+        <div class="card">
+            <div class="label">Customer</div>
+            <div class="value">Northwind Systems</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Project</div>
+            <div class="value">Line Pressure Test</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Work Order</div>
+            <div class="value">WO-521</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Test Location</div>
+            <div class="value">Plant 2 / Bay 6</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Operator</div>
+            <div class="value">Operator A</div>
+        </div>
+
+    </div>
+
+
+    <h2>Data Log</h2>
+
+    <table>
+
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Elapsed</th>
+                <th>Pressure</th>
+                <th>Unit</th>
+                <th>Pressure Drop</th>
+                <th>Result</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            <tr><td>2026-09-12 01:32:04</td><td>0:00:01</td><td>22.13</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-12 01:32:05</td><td>0:00:02</td><td>22.13</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-12 01:32:07</td><td>0:00:04</td><td>22.13</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-12 01:32:09</td><td>0:00:06</td><td>22.13</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-12 01:32:11</td><td>0:00:08</td><td>22.13</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-12 01:32:12</td><td>0:00:09</td><td>22.13</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-12 01:32:14</td><td>0:00:11</td><td>22.13</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-12 01:32:16</td><td>0:00:13</td><td>22.13</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-12 01:32:18</td><td>0:00:15</td><td>22.13</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-12 01:32:19</td><td>0:00:16</td><td>22.13</td><td>psi</td><td>0.0</td><td>Pending</td></tr>
+<tr><td>2026-09-12 01:32:21</td><td>0:00:18</td><td>22.13</td><td>psi</td><td>0.0</td><td>PASS</td></tr>
+        </tbody>
+
+    </table>
+
+
+    <h2>Pressure vs Time</h2>
+
+    <div class="chart-container">
+        <canvas id="pressureChart"></canvas>
+    </div>
+
+
+    <h2>Remarks</h2>
+
+    <p>Routine acceptance test.</p>
+
+
+    <script>
+
+        const labels = ["0:00:01", "0:00:02", "0:00:04", "0:00:06", "0:00:08", "0:00:09", "0:00:11", "0:00:13", "0:00:15", "0:00:16", "0:00:18"];
+
+        const pressures = [22.13, 22.13, 22.13, 22.13, 22.13, 22.13, 22.13, 22.13, 22.13, 22.13, 22.13];
+
+        const ctx = document.getElementById('pressureChart');
+
+        new Chart(ctx, {
+            type: 'line',
+
+            data: {
+                labels: labels,
+
+                datasets: [{
+                    label: 'Pressure',
+                    data: pressures,
+
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.15)',
+
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 2
+                }]
+            },
+
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                },
+
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Elapsed Time'
+                        }
+                    },
+
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Pressure'
+                        }
+                    }
+                }
+            }
+        });
+
+    </script>
+
+</body>
+</html>
