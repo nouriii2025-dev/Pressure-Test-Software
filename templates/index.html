@@ -148,6 +148,46 @@
             100% { box-shadow: 0 0 0 9px rgba(52, 211, 153, 0); }
         }
 
+
+        /* Compact test timer (top bar) */
+        .topbar-right { display: flex; align-items: center; gap: 14px; flex: none; }
+
+        .timer {
+            display: flex; flex-direction: column; gap: 5px;
+            min-width: 128px;
+            padding: 6px 12px 7px;
+            border-radius: 10px;
+            background: #17263d;
+            border: 1px solid #2b3f5e;
+            color: #8fa2bd;
+        }
+
+        .timer-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; line-height: 1; }
+
+        .timer-elapsed {
+            font-size: 1.05rem;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            color: #aab8cc;
+        }
+
+        .timer-total { font-size: 0.74rem; white-space: nowrap; }
+
+        .timer-bar { height: 3px; border-radius: 2px; background: #243752; overflow: hidden; }
+
+        .timer-fill {
+            height: 100%; width: 0%;
+            background: #7e8ea5;
+            transition: width 0.9s linear;
+        }
+
+        .timer.is-running { border-color: #1b6a53; background: #0f2f2a; }
+        .timer.is-running .timer-elapsed { color: #ffffff; }
+        .timer.is-running .timer-fill { background: #34d399; }
+
+        .timer.is-done .timer-elapsed { color: #e8eef7; }
+        .timer.is-done .timer-fill { background: #7db4f5; }
+
         /* ============================================================
            LAYOUT
            ============================================================ */
@@ -637,6 +677,14 @@
             .chart-wrap { height: 300px; }
             .channel-cards { grid-template-columns: 1fr; }
             .action-secondary { grid-template-columns: 1fr; }
+            .brand-badge { display: none; }
+            .brand h1 { font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .brand > div:last-child { min-width: 0; }
+            .status-pill { padding: 6px 11px 6px 10px; font-size: 0.8rem; }
+            .topbar-right { gap: 8px; }
+            .timer { min-width: 0; padding: 5px 9px 6px; }
+            .timer-total { display: none; }
+            .timer-elapsed { font-size: 0.9rem; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -659,10 +707,19 @@
             <small>ABB RVG 200 — Multi-Channel Real-Time Monitoring</small>
         </div>
     </div>
+    <div class="topbar-right">
+    <div class="timer" id="timer" title="Elapsed test time">
+        <div class="timer-row">
+            <span class="timer-elapsed" id="timerElapsed">00:00:00</span>
+            <span class="timer-total" id="timerTotal"></span>
+        </div>
+        <div class="timer-bar" aria-hidden="true"><div class="timer-fill" id="timerFill"></div></div>
+    </div>
     <div class="status-pill" id="statusPill" role="status" aria-live="polite">
         <span class="status-dot" id="statusDot"></span>
         <span id="statusText">Idle</span>
     </div>
+</div>
 </header>
 
 <div class="layout">
@@ -782,7 +839,7 @@
 
                         <div class="field full">
                             <label for="description">Description</label>
-                            <input id="description" type="text" value="TEST PORT-1 CH-1 / TEST PORT-3 CH-2" />
+                            <input id="description" type="text"/>
                         </div>
 
                         <div class="field">
@@ -913,6 +970,10 @@ const chartUnitLabel   = document.getElementById('chartUnitLabel');
 const summaryList      = document.getElementById('channelSummaryList');
 const startBtn         = document.getElementById('startBtn');
 const stopBtn          = document.getElementById('stopBtn');
+const timerBox     = document.getElementById('timer');
+const timerElapsed = document.getElementById('timerElapsed');
+const timerTotal   = document.getElementById('timerTotal');
+const timerFill    = document.getElementById('timerFill');
 
 /* ============================================================
    STATE
@@ -961,13 +1022,23 @@ function renderChannelGrid() {
             renderChannelGrid();
             renderRatingInputs();
             updateActiveCount();
+            updateDescription();
         });
         channelGrid.appendChild(chip);
     }
 }
 
+function updateDescription() {
+                const sorted = [...selectedChannels].sort((a, b) => a - b);
+                // Test port = actual channel number, CH label = sequential position
+                document.getElementById('description').value = sorted
+                    .map((port, i) => `TEST PORT-${port} CH-${i + 1}`)
+                    .join(' / ');
+            }
+
 function updateActiveCount() {
     activeCount.textContent = `${selectedChannels.size} channel${selectedChannels.size === 1 ? '' : 's'}`;
+    updateDescription();
 }
 
 /* ============================================================
@@ -1039,7 +1110,8 @@ const chart = new Chart(document.getElementById('pressureChart'), {
                 title: { display: true, text: 'Elapsed Time', color: '#66758a', font: { size: 11, weight: '500' } }
             },
             y: {
-                beginAtZero: false,
+                min: 0,
+                beginAtZero: true,
                 ticks: { color: '#66758a', font: { size: 11 } },
                 grid: { color: '#e6ebf1' },
                 border: { display: false },
@@ -1127,15 +1199,19 @@ function renderChart(data) {
         }
     });
 
+    // Anchor every line at zero at t = 0
+    if (labels.length) labels = ['0:00:00', ...labels];
+
     const datasets = channels.map((ch, idx) => {
         const hist = channelData[String(ch)]?.history || [];
+        const pressures = hist.map(s => s.pressure);
         return {
             label: `CH-${ch}`,
-            data: hist.map(s => s.pressure),
+            data: pressures.length ? [0, ...pressures] : [],
             borderColor: CHANNEL_COLORS[(ch - 1) % CHANNEL_COLORS.length],
             backgroundColor: 'transparent',
             borderWidth: 2,
-            tension: 0.25,
+            cubicInterpolationMode: 'monotone',
             pointRadius: 0,
             spanGaps: true,
         };
@@ -1213,6 +1289,46 @@ function renderSummary(data) {
 }
 
 /* ============================================================
+   TIMER (display only; uses elapsed_time / test_duration from /api/state)
+   ============================================================ */
+let lastState = null;
+
+function hhmmss(totalSeconds) {
+    const t = Math.max(0, Math.floor(totalSeconds || 0));
+    const h = String(Math.floor(t / 3600)).padStart(2, '0');
+    const m = String(Math.floor((t % 3600) / 60)).padStart(2, '0');
+    const s = String(t % 60).padStart(2, '0');
+    return `${h}:${m}:${s}`;
+}
+
+function parseElapsed(str) {
+    // backend sends H:MM:SS (or "D day, H:MM:SS")
+    if (!str) return 0;
+    const m = String(str).match(/(?:(\d+)\s+days?,\s*)?(\d+):(\d{2}):(\d{2})/);
+    if (!m) return 0;
+    return (Number(m[1] || 0) * 86400) + Number(m[2]) * 3600 + Number(m[3]) * 60 + Number(m[4]);
+}
+
+function renderTimer(data) {
+    const hasSession = Boolean(data && data.session_id);
+    const running = Boolean(data && data.running);
+    const elapsed = hasSession ? parseElapsed(data.elapsed_time) : 0;
+    // With no session yet, preview the duration typed in Test Settings
+    const total = hasSession
+        ? Number(data.session_data?.test_duration || 0)
+        : Number(document.getElementById('testDuration').value || 0) * 60;
+
+    timerElapsed.textContent = hhmmss(elapsed);
+    timerTotal.textContent = total > 0 ? `/ ${hhmmss(total)}` : '';
+    timerFill.style.width = total > 0 ? `${Math.min(100, (elapsed / total) * 100)}%` : '0%';
+    timerBox.title = total > 0 ? `Remaining ${hhmmss(total - elapsed)}` : 'Elapsed test time';
+
+    timerBox.classList.toggle('is-running', running);
+    timerBox.classList.toggle('is-done', hasSession && !running);
+}
+
+
+/* ============================================================
    POLL STATE
    ============================================================ */
 async function fetchState() {
@@ -1226,6 +1342,9 @@ async function fetchState() {
         stopBtn.disabled = !isRunning;
 
         setStatus(data.status || 'Idle', isRunning);
+        setStatus(data.status || 'Idle', isRunning);
+        lastState = data;       // <-- add
+        renderTimer(data);      // <-- add
 
         renderChannelCards(data);
         renderChart(data);
@@ -1364,12 +1483,14 @@ async function openReport() {
 /* ============================================================
    INIT
    ============================================================ */
+
 document.getElementById('selectAllBtn').addEventListener('click', () => {
     if (isRunning) return;
     selectedChannels = new Set(Array.from({ length: TOTAL_CHANNELS }, (_, i) => i + 1));
     renderChannelGrid();
     renderRatingInputs();
     updateActiveCount();
+    updateDescription();
 });
 
 document.getElementById('clearAllBtn').addEventListener('click', () => {
@@ -1378,6 +1499,7 @@ document.getElementById('clearAllBtn').addEventListener('click', () => {
     renderChannelGrid();
     renderRatingInputs();
     updateActiveCount();
+    updateDescription();
 });
 
 startBtn.addEventListener('click', startTest);
@@ -1387,10 +1509,13 @@ document.getElementById('exportBtn').addEventListener('click', exportCsv);
 document.getElementById('reportBtn').addEventListener('click', openReport);
 
 document.getElementById('testDate').value = new Date().toISOString().slice(0, 10);
+document.getElementById('testDuration').addEventListener('input', () => renderTimer(lastState));
+renderTimer(null);
 
 renderChannelGrid();
 renderRatingInputs();
 updateActiveCount();
+updateDescription();
 
 fetchState();
 setInterval(fetchState, 1000);

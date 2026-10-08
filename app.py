@@ -15,7 +15,7 @@ app = Flask(__name__)
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-IP_ADDRESS = '192.168.1.135'
+IP_ADDRESS = '192.168.1.19'
 PORT = 502
 DEVICE_ID = 255
 TOTAL_CHANNELS = 6
@@ -659,6 +659,9 @@ def generate_report_file(session):
             for sample in session['channel_data'][longest_channel]['history']
         ]
 
+    if labels:
+        labels = ['0:00:00'] + labels
+
     # Create one dataset for EVERY selected channel
     for ch in channels:
         slot = session['channel_data'][ch]
@@ -676,6 +679,9 @@ def generate_report_file(session):
                 [None] * (max_labels - len(pressures))
             )
 
+        if history:
+            pressures = [0] + pressures
+
         chart_datasets.append({
             'label': f'CH-{ch}',
             'data': pressures,
@@ -684,7 +690,7 @@ def generate_report_file(session):
             'borderWidth': 2,
             'pointRadius': 0,
             'pointHoverRadius': 4,
-            'tension': 0.2,
+            'cubicInterpolationMode': 'monotone',
             'spanGaps': True,
             'fill': False,
         })
@@ -968,13 +974,26 @@ def _report_template():
         padding: 5px 10px;
     }
 
+    .report-actions { max-width: 1180px; margin: 20px auto 0; display: flex; justify-content: flex-end; gap: 10px; }
+    .report-actions button { font-family: inherit; font-size: 13px; font-weight: 600; padding: 8px 18px; border: 1px solid #1f2937; border-radius: 4px; background: #fff; color: #1f2937; cursor: pointer; }
+    .report-actions button.primary { background: #1f2937; color: #fff; }
+    .report-actions button:hover { opacity: 0.85; }
+    .report-actions + .report { margin-top: 10px; }
+
     @media print {
         body { margin: 0; }
         .report { margin: 0; border-width: 1px; }
+        .no-print { display: none !important; }
     }
 </style>
 </head>
 <body>
+
+<div class="report-actions no-print" data-no-export="true">
+    <button type="button" class="primary" id="saveReportBtn">Save Report</button>
+    <button type="button" id="printReportBtn">Print</button>
+</div>
+
 <div class="report">
 
     <!-- ============ MAIN: chart + test blocks ============ -->
@@ -1097,6 +1116,7 @@ new Chart(document.getElementById('pressureChart'), {
             },
 
             y: {
+                min: 0,
                 beginAtZero: true,
                 grace: '5%',
                 grid: {
@@ -1114,6 +1134,36 @@ new Chart(document.getElementById('pressureChart'), {
         }
     }
 });
+
+document.getElementById('printReportBtn').addEventListener('click', function () {
+    window.print();
+});
+
+document.getElementById('saveReportBtn').addEventListener('click', function () {
+    const clone = document.documentElement.cloneNode(true);
+    const liveCanvas = document.getElementById('pressureChart');
+    const cloneCanvas = clone.querySelector('#pressureChart');
+    if (liveCanvas && cloneCanvas) {
+        const img = document.createElement('img');
+        img.src = liveCanvas.toDataURL('image/png');
+        img.alt = 'Pressure chart';
+        img.style.width  = liveCanvas.clientWidth  + 'px';
+        img.style.height = liveCanvas.clientHeight + 'px';
+        img.style.display = 'block';
+        cloneCanvas.replaceWith(img);
+    }
+    clone.querySelectorAll('.no-print, [data-no-export], script').forEach(function (el) { el.remove(); });
+    const blob = new Blob(['<!DOCTYPE html>\n' + clone.outerHTML], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '__SESSION_ID___report.html';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+});
+
 </script>
 </body>
 </html>"""
