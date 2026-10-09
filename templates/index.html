@@ -652,6 +652,13 @@
         .summary-stats .v { font-size: 0.86rem; font-weight: 600; }
         .summary-stats .u { font-weight: 400; color: var(--muted); font-size: 0.75rem; }
 
+        .conn-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .conn-actions button { flex: 1; min-height: 36px; font-size: 0.82rem; }
+        .conn-msg { margin-top: 10px; font-size: 0.8rem; min-height: 1.2em; }
+        .conn-msg.ok  { color: var(--ok); }
+        .conn-msg.err { color: var(--bad); }
+        .conn-msg.info { color: var(--muted); }
+
         /* ============================================================
            RESPONSIVE
            ============================================================ */
@@ -731,6 +738,31 @@
         </div>
 
         <div class="sidebar-scroll">
+             <!-- INSTRUMENT CONNECTION -->
+            <details class="section" id="connSection">
+                <summary>Instrument Connection</summary>
+                <div class="section-body">
+                    <div class="form-grid">
+                        <div class="field full">
+                            <label for="instIp">Instrument IP Address</label>
+                            <input id="instIp" type="text" autocomplete="off" spellcheck="false" />
+                        </div>
+                        <div class="field">
+                            <label for="instPort">Port</label>
+                            <input id="instPort" type="number" min="1" max="65535" value="502" />
+                        </div>
+                        <div class="field">
+                            <label for="instDeviceId">Device ID</label>
+                            <input id="instDeviceId" type="number" min="0" max="255" value="255" />
+                        </div>
+                    </div>
+                    <div class="conn-actions">
+                        <button class="secondary" id="testConnBtn" type="button">Test Connection</button>
+                        <button class="primary" id="saveConnBtn" type="button">Save</button>
+                    </div>
+                    <div class="conn-msg info" id="connMsg" role="status" aria-live="polite"></div>
+                </div>
+            </details>
             <!-- CHANNEL SELECTION -->
             <details class="section" open>
                 <summary>Active Channels</summary>
@@ -1340,6 +1372,7 @@ async function fetchState() {
         isRunning = Boolean(data.running);
         startBtn.disabled = isRunning;
         stopBtn.disabled = !isRunning;
+        lockConnInputs();
 
         setStatus(data.status || 'Idle', isRunning);
         setStatus(data.status || 'Idle', isRunning);
@@ -1479,6 +1512,87 @@ async function openReport() {
         alert('Failed to open report: ' + err.message);
     }
 }
+
+/* ============================================================
+   INSTRUMENT CONNECTION SETTINGS
+   ============================================================ */
+const instIp       = document.getElementById('instIp');
+const instPort     = document.getElementById('instPort');
+const instDeviceId = document.getElementById('instDeviceId');
+const connMsg      = document.getElementById('connMsg');
+const saveConnBtn  = document.getElementById('saveConnBtn');
+const testConnBtn  = document.getElementById('testConnBtn');
+
+function setConnMsg(text, kind) {
+    connMsg.textContent = text || '';
+    connMsg.className = 'conn-msg ' + (kind || 'info');
+}
+
+function connPayload() {
+    return {
+        ip_address: instIp.value.trim(),
+        port: Number(instPort.value),
+        device_id: Number(instDeviceId.value),
+    };
+}
+
+async function loadConnSettings() {
+    try {
+        const res = await fetch('/api/settings');
+        const s = await res.json();
+        instIp.value = s.ip_address ?? '';
+        instPort.value = s.port ?? 502;
+        instDeviceId.value = s.device_id ?? 255;
+    } catch (err) {
+        setConnMsg('Could not load connection settings.', 'err');
+    }
+}
+
+async function saveConnSettings() {
+    saveConnBtn.disabled = true;
+    try {
+        const res = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(connPayload()),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+            setConnMsg(data.error || 'Failed to save.', 'err');
+        } else {
+            setConnMsg(`Saved. Using ${data.ip_address}:${data.port}.`, 'ok');
+        }
+    } catch (err) {
+        setConnMsg('Failed to save: ' + err.message, 'err');
+    }
+    saveConnBtn.disabled = isRunning;
+}
+
+async function testConn() {
+    testConnBtn.disabled = true;
+    setConnMsg('Testing connection…', 'info');
+    try {
+        const res = await fetch('/api/test_connection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(connPayload()),
+        });
+        const data = await res.json();
+        setConnMsg(data.ok ? data.message : (data.error || 'Connection failed.'), data.ok ? 'ok' : 'err');
+    } catch (err) {
+        setConnMsg('Test failed: ' + err.message, 'err');
+    }
+    testConnBtn.disabled = isRunning;
+}
+
+function lockConnInputs() {
+    [instIp, instPort, instDeviceId, saveConnBtn, testConnBtn].forEach(el => el.disabled = isRunning);
+}
+
+saveConnBtn.addEventListener('click', saveConnSettings);
+testConnBtn.addEventListener('click', testConn);
+loadConnSettings();
+
 
 /* ============================================================
    INIT

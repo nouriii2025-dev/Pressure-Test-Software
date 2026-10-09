@@ -9,15 +9,23 @@ import json
 import math
 from flask import Flask, jsonify, render_template, request, send_file
 from pymodbus.client import ModbusTcpClient
+import ipaddress
+import re
+import base64
 
 app = Flask(__name__)
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-IP_ADDRESS = '192.168.1.19'
-PORT = 502
-DEVICE_ID = 255
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SETTINGS_FILE = os.path.join(BASE_DIR, 'settings.json')
+
+DEFAULT_SETTINGS = {
+    'ip_address': '',
+    'port': 502,
+    'device_id': 255,
+}
 TOTAL_CHANNELS = 6
 
 ARCHIVE_LOG_FILE = 'abb_data_log.csv'
@@ -26,6 +34,18 @@ REPORT_DIR = 'reports'
 
 os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(REPORT_DIR, exist_ok=True)
+
+LOGO_FILE = os.path.join(BASE_DIR, 'weatherford_logo.png')
+
+def get_logo_data_uri():
+    """Return the logo as a data URI so it survives 'Save Report'."""
+    try:
+        with open(LOGO_FILE, 'rb') as f:
+            return 'data:image/png;base64,' + base64.b64encode(f.read()).decode('ascii')
+    except Exception as exc:
+        print(f"[LOGO WARN] {exc}")
+        return ''
+
 
 app.config['JSON_SORT_KEYS'] = False
 
@@ -37,6 +57,76 @@ state = {
     'error': None,
     'thread': None,
 }
+
+# ---------------------------------------------------------------------------
+# Instrument connection settings (persisted in settings.json)
+# ---------------------------------------------------------------------------
+settings_lock = threading.Lock()
+settings = dict(DEFAULT_SETTINGS)
+
+_HOSTNAME_RE = re.compile(
+    r'^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$'
+)
+
+
+def validate_settings(data):
+    """Return (clean_settings, error_message)."""
+    data = data or {}
+    ip = str(data.get('ip_address', '')).strip()
+    if not ip:
+        return None, 'IP address is required.'
+
+    try:
+        ipaddress.ip_address(ip)
+    except ValueError:
+        if not _HOSTNAME_RE.match(ip):
+            return None, 'Enter a valid IP address (e.g. 192.168.1.135).'
+
+    try:
+        port = int(data.get('port', DEFAULT_SETTINGS['port']))
+        device_id = int(data.get('device_id', DEFAULT_SETTINGS['device_id']))
+    except (TypeError, ValueError):
+        return None, 'Port and Device ID must be numbers.'
+
+    if not 1 <= port <= 65535:
+        return None, 'Port must be between 1 and 65535.'
+    if not 0 <= device_id <= 255:
+        return None, 'Device ID must be between 0 and 255.'
+
+    return {'ip_address': ip, 'port': port, 'device_id': device_id}, None
+
+
+def load_settings():
+    global settings
+    loaded = dict(DEFAULT_SETTINGS)
+    try:
+        with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+            clean, err = validate_settings({**DEFAULT_SETTINGS, **json.load(f)})
+            if not err:
+                loaded = clean
+            else:
+                print(f"[SETTINGS WARN] {err} Using defaults.")
+    except FileNotFoundError:
+        pass
+    except Exception as exc:
+        print(f"[SETTINGS WARN] Could not read settings: {exc}")
+    with settings_lock:
+        settings = loaded
+
+
+def save_settings_to_disk(clean):
+    tmp = SETTINGS_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(clean, f, indent=2)
+    os.replace(tmp, SETTINGS_FILE)  # atomic, avoids a half-written file
+
+
+def get_settings():
+    with settings_lock:
+        return dict(settings)
+
+
+load_settings()
 
 
 # ---------------------------------------------------------------------------
@@ -118,9 +208,25 @@ def write_session_log(session, row):
 # ---------------------------------------------------------------------------
 # Modbus
 # ---------------------------------------------------------------------------
+# def read_abb_data():
+#     """Read all 6 channels from the ABB RVG 200."""
+#     client = ModbusTcpClient(IP_ADDRESS, port=PORT, timeout=3)
+#     readings = {}
+
+#     if not client.connect():
+#         return None
+
+#     try:
+#         for channel in range(1, TOTAL_CHANNELS + 1):
+#             start_addr = (channel - 1) * 2
+#             try:
+#                 response = client.read_holding_registers(
+#                     address=start_addr, count=2, device_id=DEVICE_ID
+#                 )
 def read_abb_data():
     """Read all 6 channels from the ABB RVG 200."""
-    client = ModbusTcpClient(IP_ADDRESS, port=PORT, timeout=3)
+    cfg = get_settings()
+    client = ModbusTcpClient(cfg['ip_address'], port=cfg['port'], timeout=3)
     readings = {}
 
     if not client.connect():
@@ -131,7 +237,7 @@ def read_abb_data():
             start_addr = (channel - 1) * 2
             try:
                 response = client.read_holding_registers(
-                    address=start_addr, count=2, device_id=DEVICE_ID
+                    address=start_addr, count=2, device_id=cfg['device_id']
                 )
             except Exception:
                 readings[f'Ch_{channel}'] = None
@@ -761,6 +867,7 @@ def generate_report_file(session):
         '__TABLE_ROWS__': table_html,
         '__LABELS_JSON__': labels_json,
         '__DATASETS_JSON__': datasets_json,
+        '__LOGO__': get_logo_data_uri(),
     }
     for placeholder, value in replacements.items():
         html = html.replace(placeholder, value)
@@ -784,6 +891,8 @@ def _report_template():
 <meta charset="UTF-8">
 <title>Pressure Test Report - __SESSION_ID__</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <style>
     * { box-sizing: border-box; }
     html, body {
@@ -974,6 +1083,12 @@ def _report_template():
         padding: 5px 10px;
     }
 
+    .wf-logo .wf-img {
+        width: 170px;
+        height: auto;
+        display: block;
+    }
+
     .report-actions { max-width: 1180px; margin: 20px auto 0; display: flex; justify-content: flex-end; gap: 10px; }
     .report-actions button { font-family: inherit; font-size: 13px; font-weight: 600; padding: 8px 18px; border: 1px solid #1f2937; border-radius: 4px; background: #fff; color: #1f2937; cursor: pointer; }
     .report-actions button.primary { background: #1f2937; color: #fff; }
@@ -1015,18 +1130,12 @@ def _report_template():
 
         <div class="footer-left">
             <div class="wf-logo">
-                <svg class="mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M50 90 L10 35 Q5 28 12 25 L50 15 L88 25 Q95 28 90 35 Z"
-                          fill="#c8102e"/>
-                    <path d="M50 90 L30 50 L50 55 L70 50 Z" fill="#fff" opacity="0.9"/>
-                </svg>
-                <div class="name">Weatherford</div>
+                <img class="wf-img" src="__LOGO__" alt="Weatherford">
                 <div class="addr">
                     Weatherford<br/>
                     Abu Dhabi<br/>
                     UAE
                 </div>
-                <div class="version">2.11.1.2 (Build 75)</div>
             </div>
 
             <div class="fields">
@@ -1139,29 +1248,87 @@ document.getElementById('printReportBtn').addEventListener('click', function () 
     window.print();
 });
 
-document.getElementById('saveReportBtn').addEventListener('click', function () {
-    const clone = document.documentElement.cloneNode(true);
-    const liveCanvas = document.getElementById('pressureChart');
-    const cloneCanvas = clone.querySelector('#pressureChart');
-    if (liveCanvas && cloneCanvas) {
-        const img = document.createElement('img');
-        img.src = liveCanvas.toDataURL('image/png');
-        img.alt = 'Pressure chart';
-        img.style.width  = liveCanvas.clientWidth  + 'px';
-        img.style.height = liveCanvas.clientHeight + 'px';
-        img.style.display = 'block';
-        cloneCanvas.replaceWith(img);
+
+async function buildPdfBlob() {
+    const el = document.querySelector('.report');
+    const canvas = await html2canvas(el, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        ignoreElements: function (n) {
+            return n.classList && n.classList.contains('no-print');
+        }
+    });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 8;
+
+    const ratio = Math.min(
+        (pageW - margin * 2) / canvas.width,
+        (pageH - margin * 2) / canvas.height
+    );
+    const w = canvas.width * ratio;
+    const h = canvas.height * ratio;
+
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG',
+                 (pageW - w) / 2, margin, w, h);
+    return pdf.output('blob');
+}
+
+document.getElementById('saveReportBtn').addEventListener('click', async function () {
+    const btn = this;
+    const suggestedName = '__SESSION_ID___report.pdf';
+    let handle = null;
+
+    // Open the Save As dialog FIRST (must happen right after the click,
+    // before the slow PDF rendering, or the browser blocks it).
+    if (window.showSaveFilePicker) {
+        try {
+            handle = await window.showSaveFilePicker({
+                suggestedName: suggestedName,
+                types: [{
+                    description: 'PDF document',
+                    accept: { 'application/pdf': ['.pdf'] }
+                }]
+            });
+        } catch (err) {
+            if (err && err.name === 'AbortError') return;  // user cancelled
+            handle = null;  // picker unavailable -> fall back below
+        }
     }
-    clone.querySelectorAll('.no-print, [data-no-export], script').forEach(function (el) { el.remove(); });
-    const blob = new Blob(['<!DOCTYPE html>\n' + clone.outerHTML], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = '__SESSION_ID___report.html';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Generating PDF...';
+
+    try {
+        const blob = await buildPdfBlob();
+
+        if (handle) {
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+        } else {
+            // Fallback: normal download
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = suggestedName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Could not save the PDF: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
 });
 
 </script>
@@ -1192,7 +1359,7 @@ def monitoring_loop():
                     break
 
                 if reading is None:
-                    state['error'] = 'Unable to read data from AB RVG 200.'
+                    state['error'] = f"Unable to read data from RVG 200 at {get_settings()['ip_address']}."
                 else:
                     update_session_from_reading(session, reading)
                     state['error'] = None
@@ -1544,6 +1711,59 @@ def serve_report(filename):
         return response
 
     return 'Report not found', 404
+
+
+@app.route('/api/settings', methods=['GET'])
+def api_get_settings():
+    return jsonify(get_settings())
+
+
+@app.route('/api/settings', methods=['POST'])
+def api_save_settings():
+    with state_lock:
+        if state['running']:
+            return jsonify({'error': 'Stop the running test before changing connection settings.'}), 400
+
+    clean, err = validate_settings(request.get_json(silent=True))
+    if err:
+        return jsonify({'error': err}), 400
+
+    try:
+        save_settings_to_disk(clean)
+    except Exception as exc:
+        return jsonify({'error': f'Could not save settings: {exc}'}), 500
+
+    global settings
+    with settings_lock:
+        settings = clean
+    return jsonify({'status': 'saved', **clean})
+
+
+@app.route('/api/test_connection', methods=['POST'])
+def api_test_connection():
+    """Try the values currently typed in the UI (saved or not)."""
+    with state_lock:
+        if state['running']:
+            return jsonify({'ok': False, 'error': 'Cannot test while a test is running.'}), 400
+
+    payload = request.get_json(silent=True)
+    clean, err = validate_settings(payload) if payload else (get_settings(), None)
+    if err:
+        return jsonify({'ok': False, 'error': err}), 400
+
+    client = ModbusTcpClient(clean['ip_address'], port=clean['port'], timeout=3)
+    try:
+        if not client.connect():
+            return jsonify({'ok': False, 'error': f"Could not connect to {clean['ip_address']}:{clean['port']}."})
+        resp = client.read_holding_registers(address=0, count=2, device_id=clean['device_id'])
+        if resp.isError():
+            return jsonify({'ok': False, 'error': 'Connected, but the device did not respond to a read. Check the Device ID.'})
+        return jsonify({'ok': True, 'message': f"Connected to {clean['ip_address']}:{clean['port']}."})
+    except Exception as exc:
+        return jsonify({'ok': False, 'error': str(exc)})
+    finally:
+        client.close()
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)

@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Pressure Test Report - 20261009_102403</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<style>
+    * { box-sizing: border-box; }
+    html, body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        background: #fff;
+        color: #000;
+    }
+    .report {
+        max-width: 1180px;
+        margin: 20px auto;
+        border: 1.5px solid #1f2937;
+        background: #fff;
+        font-size: 12px;
+    }
+
+    /* ================= HEADER (chart-left / tests-right) ================= */
+    .main {
+        display: grid;
+        grid-template-columns: 1.75fr 1fr;
+        min-height: 480px;
+        border-bottom: 1.5px solid #1f2937;
+    }
+
+    .chart-pane {
+        padding: 12px 14px;
+        border-right: 1.5px solid #1f2937;
+        position: relative;
+    }
+    .chart-pane .axis-label {
+        position: absolute;
+        top: 8px;
+        left: 14px;
+        font-size: 11px;
+        color: #374151;
+    }
+    .chart-wrap {
+        position: relative;
+        height: 440px;
+        width: 100%;
+    }
+
+    /* ================= TEST BLOCKS (right side) ================= */
+    .tests-pane {
+        padding: 10px 14px;
+        overflow: hidden;
+    }
+
+    .test-block {
+        padding: 8px 0 14px;
+        border-bottom: 1px dashed #cbd5e1;
+    }
+    .test-block:last-child { border-bottom: none; }
+
+    .test-title {
+        font-weight: 700;
+        font-size: 13px;
+        margin-bottom: 6px;
+    }
+    .test-title .pass { color: #047857; font-weight: 700; }
+    .test-title .fail { color: #b91c1c; font-weight: 700; }
+
+    table.kv {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+    }
+    table.kv td {
+        padding: 2px 4px;
+        vertical-align: top;
+    }
+    table.kv td.k {
+        color: #374151;
+        white-space: nowrap;
+        padding-right: 10px;
+        width: 1%;
+    }
+    table.kv td.v {
+        text-align: left;
+    }
+
+    /* ================= FOOTER (branding + signature) ================= */
+    .footer {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        font-size: 12px;
+    }
+
+    .footer-left {
+        padding: 14px 18px;
+        border-right: 1.5px solid #1f2937;
+        display: flex;
+        gap: 16px;
+    }
+    .wf-logo {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        min-width: 200px;
+    }
+    .wf-logo .mark {
+        width: 42px;
+        height: 42px;
+        margin-bottom: 4px;
+    }
+    .wf-logo .name {
+        font-size: 24px;
+        font-weight: 900;
+        letter-spacing: -0.5px;
+        color: #000;
+        line-height: 1;
+    }
+    .wf-logo .addr {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #374151;
+        line-height: 1.35;
+    }
+    .wf-logo .version {
+        margin-top: 24px;
+        font-size: 9px;
+        color: #6b7280;
+    }
+
+    .footer-left .fields {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+    }
+    .footer-left .fields .row {
+        display: flex;
+        gap: 8px;
+    }
+    .footer-left .fields .row .k {
+        color: #374151;
+        min-width: 80px;
+    }
+    .footer-left .fields .row .v {
+        font-weight: 600;
+    }
+
+    .footer-right {
+        padding: 14px 18px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .footer-right .fields {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+    }
+    .footer-right .fields .row {
+        display: flex;
+        gap: 8px;
+    }
+    .footer-right .fields .row .k {
+        color: #374151;
+        min-width: 80px;
+    }
+    .footer-right .fields .row .v { font-weight: 600; }
+
+    .signature {
+        margin-top: 18px;
+        font-size: 12px;
+    }
+    .signature .label { color: #374151; }
+    .signature .line {
+        display: inline-block;
+        border-bottom: 1px solid #1f2937;
+        min-width: 180px;
+        margin-left: 6px;
+        vertical-align: bottom;
+    }
+
+    .footer-bottom {
+        grid-column: 1 / -1;
+        border-top: 1.5px solid #1f2937;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 9px;
+        color: #6b7280;
+        padding: 5px 10px;
+    }
+
+    .wf-logo .wf-img {
+        width: 170px;
+        height: auto;
+        display: block;
+    }
+
+    .report-actions { max-width: 1180px; margin: 20px auto 0; display: flex; justify-content: flex-end; gap: 10px; }
+    .report-actions button { font-family: inherit; font-size: 13px; font-weight: 600; padding: 8px 18px; border: 1px solid #1f2937; border-radius: 4px; background: #fff; color: #1f2937; cursor: pointer; }
+    .report-actions button.primary { background: #1f2937; color: #fff; }
+    .report-actions button:hover { opacity: 0.85; }
+    .report-actions + .report { margin-top: 10px; }
+
+    @media print {
+        body { margin: 0; }
+        .report { margin: 0; border-width: 1px; }
+        .no-print { display: none !important; }
+    }
+</style>
+</head>
+<body>
+
+<div class="report-actions no-print" data-no-export="true">
+    <button type="button" class="primary" id="saveReportBtn">Save Report</button>
+    <button type="button" id="printReportBtn">Print</button>
+</div>
+
+<div class="report">
+
+    <!-- ============ MAIN: chart + test blocks ============ -->
+    <div class="main">
+
+        <div class="chart-pane">
+            <div class="chart-wrap">
+                <canvas id="pressureChart"></canvas>
+            </div>
+        </div>
+
+        <div class="tests-pane">
+            
+        <div class="test-block">
+            <div class="test-title">
+                Test 1 &hellip; <span class="pass">PASS</span>
+            </div>
+            <table class="kv">
+                <tr><td class="k">Input</td><td class="v">20K</td></tr>
+                <tr><td class="k">Start</td><td class="v">10:24:04 (+0.02 m)</td></tr>
+                <tr><td class="k">End</td><td class="v">10:24:39 (+0.60 m)</td></tr>
+                <tr><td class="k">Test duration</td><td class="v">0:01:00</td></tr>
+                <tr><td class="k">Start value</td><td class="v">740.32 psi</td></tr>
+                <tr><td class="k">End value</td><td class="v">740.26 psi</td></tr>
+                <tr><td class="k">Max. error</td><td class="v">0.24 psi</td></tr>
+                <tr><td class="k">Relative error</td><td class="v">&plusmn;0.03 %</td></tr>
+            </table>
+        </div>
+        
+
+        <div class="test-block">
+            <div class="test-title">
+                Test 2 &hellip; <span class="fail">NO DATA</span>
+            </div>
+            <table class="kv">
+                <tr><td class="k">Input</td><td class="v">20K</td></tr>
+                <tr><td class="k">Start</td><td class="v">-- ()</td></tr>
+                <tr><td class="k">End</td><td class="v">-- ()</td></tr>
+                <tr><td class="k">Test duration</td><td class="v">0:01:00</td></tr>
+                <tr><td class="k">Start value</td><td class="v">-- psi</td></tr>
+                <tr><td class="k">End value</td><td class="v">-- psi</td></tr>
+                <tr><td class="k">Max. error</td><td class="v">0.00 psi</td></tr>
+                <tr><td class="k">Relative error</td><td class="v">&plusmn;0.00 %</td></tr>
+            </table>
+        </div>
+        
+        </div>
+    </div>
+
+    <!-- ============ FOOTER: branding + signature ============ -->
+    <div class="footer">
+
+        <div class="footer-left">
+            <div class="wf-logo">
+                <img class="wf-img" src="data:image/png;base64,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" alt="Weatherford">
+                <div class="addr">
+                    Weatherford<br/>
+                    Abu Dhabi<br/>
+                    UAE
+                </div>
+            </div>
+
+            <div class="fields">
+                <div class="row"><span class="k">Customer</span><span class="v">:&nbsp;Northwind Systems</span></div>
+                <div class="row"><span class="k">Work Order</span><span class="v">:&nbsp;WO-521</span></div>
+                <div class="row"><span class="k">Tools</span><span class="v">:&nbsp;RVG 200</span></div>
+                <div class="row"><span class="k">Description</span><span class="v">:&nbsp;TEST PORT-1 CH-1 / TEST PORT-2 CH-2</span></div>
+            </div>
+        </div>
+
+        <div class="footer-right">
+            <div class="fields">
+                <div class="row"><span class="k">JDE</span><span class="v">:&nbsp;2867002</span></div>
+                <div class="row"><span class="k">Documents</span><span class="v">:&nbsp;D001130925</span></div>
+                <div class="row"><span class="k">Technician</span><span class="v">:&nbsp;Operator A</span></div>
+                <div class="row"><span class="k">Recorded on</span><span class="v">:&nbsp;10:24:43 09/10/2026</span></div>
+            </div>
+            <div class="signature">
+                <span class="label">Signature :</span><span class="line"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const labels   = ["0:00:00", "0:00:01", "0:00:02", "0:00:04", "0:00:06", "0:00:08", "0:00:09", "0:00:11", "0:00:13", "0:00:15", "0:00:16", "0:00:18", "0:00:20", "0:00:22", "0:00:23", "0:00:25", "0:00:27", "0:00:29", "0:00:30", "0:00:32", "0:00:34", "0:00:36"];
+const datasets = [{"label": "CH-1", "data": [0, 740.32, 740.31, 740.28, 740.17, 740.3, 740.36, 740.47, 740.33, 740.36, 740.33, 740.28, 740.21, 740.35, 740.31, 740.08, 740.34, 740.33, 740.36, 740.37, 740.3, 740.26], "borderColor": "#d97706", "backgroundColor": "transparent", "borderWidth": 2, "pointRadius": 0, "pointHoverRadius": 4, "cubicInterpolationMode": "monotone", "spanGaps": true, "fill": false}, {"label": "CH-2", "data": [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null], "borderColor": "#2563eb", "backgroundColor": "transparent", "borderWidth": 2, "pointRadius": 0, "pointHoverRadius": 4, "cubicInterpolationMode": "monotone", "spanGaps": true, "fill": false}];
+console.log("REPORT LABELS:", labels.length);
+console.log("REPORT DATASETS:", datasets);
+
+/* Highlight the last data point on each dataset (like the reference) */
+datasets.forEach(ds => {
+    if (!ds.data || !ds.data.length) return;
+    const lastIdx = ds.data.length - 1;
+    ds.pointRadius = ds.data.map((_, i) => i === lastIdx ? 4 : 0);
+    ds.pointBackgroundColor = ds.borderColor;
+    ds.pointBorderColor = '#fff';
+    ds.pointBorderWidth = 1.5;
+});
+
+new Chart(document.getElementById('pressureChart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top',
+                align: 'start',
+                labels: {
+                    boxWidth: 22,
+                    boxHeight: 2,
+                    usePointStyle: true,
+                    pointStyle: 'line',
+                    font: { size: 11 },
+                    padding: 12
+                }
+            },
+            tooltip: {
+                enabled: true
+            }
+        },
+
+        scales: {
+            x: {
+                grid: {
+                    color: '#e5e7eb',
+                    drawTicks: true
+                },
+                ticks: {
+                    color: '#374151',
+                    font: { size: 10 },
+                    maxTicksLimit: 8,
+                    callback: function(v, i) {
+                        return this.getLabelForValue(v)
+                            .replace(':', 'm ')
+                            .replace(/^00m/, '0s');
+                    }
+                },
+                border: {
+                    color: '#1f2937'
+                }
+            },
+
+            y: {
+                min: 0,
+                beginAtZero: true,
+                grace: '5%',
+                grid: {
+                    color: '#e5e7eb'
+                },
+                ticks: {
+                    color: '#374151',
+                    font: { size: 10 },
+                    maxTicksLimit: 8
+                },
+                border: {
+                    color: '#1f2937'
+                }
+            }
+        }
+    }
+});
+
+document.getElementById('printReportBtn').addEventListener('click', function () {
+    window.print();
+});
+
+
+async function buildPdfBlob() {
+    const el = document.querySelector('.report');
+    const canvas = await html2canvas(el, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        ignoreElements: function (n) {
+            return n.classList && n.classList.contains('no-print');
+        }
+    });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 8;
+
+    const ratio = Math.min(
+        (pageW - margin * 2) / canvas.width,
+        (pageH - margin * 2) / canvas.height
+    );
+    const w = canvas.width * ratio;
+    const h = canvas.height * ratio;
+
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG',
+                 (pageW - w) / 2, margin, w, h);
+    return pdf.output('blob');
+}
+
+document.getElementById('saveReportBtn').addEventListener('click', async function () {
+    const btn = this;
+    const suggestedName = '20261009_102403_report.pdf';
+    let handle = null;
+
+    // Open the Save As dialog FIRST (must happen right after the click,
+    // before the slow PDF rendering, or the browser blocks it).
+    if (window.showSaveFilePicker) {
+        try {
+            handle = await window.showSaveFilePicker({
+                suggestedName: suggestedName,
+                types: [{
+                    description: 'PDF document',
+                    accept: { 'application/pdf': ['.pdf'] }
+                }]
+            });
+        } catch (err) {
+            if (err && err.name === 'AbortError') return;  // user cancelled
+            handle = null;  // picker unavailable -> fall back below
+        }
+    }
+
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Generating PDF...';
+
+    try {
+        const blob = await buildPdfBlob();
+
+        if (handle) {
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+        } else {
+            // Fallback: normal download
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = suggestedName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Could not save the PDF: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+});
+
+</script>
+</body>
+</html>
