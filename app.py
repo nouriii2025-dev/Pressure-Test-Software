@@ -140,6 +140,24 @@ def _fmt(v):
     return f"{float(v):.2f}" if v is not None else '--'
 
 
+def test_history(session, ch):
+    """Samples from the Hold point to the Stop point."""
+    hist = session['channel_data'][ch]['history']
+    if not session.get('uses_hold'):      # imported CSV sessions: use everything
+        return hist
+    idx = session['channel_data'][ch].get('hold_index')
+    return [] if idx is None else hist[idx:]
+
+
+def _seconds_since_hold(session, timestamp):
+    try:
+        t = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+        h = datetime.fromisoformat(session['hold_at'])
+        return max(0.0, (t - h).total_seconds())
+    except Exception:
+        return 0.0
+
+
 def _esc(s):
     return (
         str(s if s is not None else '')
@@ -299,6 +317,7 @@ def create_session(config):
             'start_pressure': None,
             'current_pressure': None,
             'end_pressure': None,
+            'hold_index': None,
             # 'pressure_drop': 0.0,
             'pressure_drop': None,
             'history': [],
@@ -317,6 +336,8 @@ def create_session(config):
         'status': 'Running',
         'channels': channels,
         'channel_data': channel_data,
+        'uses_hold': True,
+        'hold_at': None,
 
         # Test config
         'unit': config.get('unit', 'psi'),
@@ -388,16 +409,21 @@ def payload_for_session(session):
             'session_data': {},
         }
 
+    timer_origin = session['started_at']
+    if session.get('uses_hold'):
+        timer_origin = session.get('hold_at')      # None until Hold is pressed
+
     elapsed_seconds = 0
-    if session['status'] == 'Running':
-        elapsed_seconds = (
-            datetime.now() - datetime.fromisoformat(session['started_at'])
-        ).total_seconds()
-    elif session.get('ended_at'):
-        elapsed_seconds = (
-            datetime.fromisoformat(session['ended_at'])
-            - datetime.fromisoformat(session['started_at'])
-        ).total_seconds()
+    if timer_origin:
+        if session['status'] == 'Running':
+            elapsed_seconds = (datetime.now() - datetime.fromisoformat(timer_origin)).total_seconds()
+        elif session.get('ended_at'):
+            elapsed_seconds = (datetime.fromisoformat(session['ended_at'])
+                            - datetime.fromisoformat(timer_origin)).total_seconds()
+
+    holding = bool(session.get('uses_hold') and session.get('hold_at')
+                and session['status'] == 'Running')
+
 
     # Flat history for frontend (with Channel column)
     flat_history = []
@@ -412,6 +438,8 @@ def payload_for_session(session):
     return {
         'running': state['running'],
         'status': session['status'],
+        'phase': 'Holding' if holding else session['status'],
+        'hold_at': session.get('hold_at'),
         'session_id': session['session_id'],
         'channels': session['channels'],
         'channel_data': {
@@ -464,6 +492,7 @@ def update_session_from_reading(session, reading):
     unit = session['unit']
     max_drop = session['max_allowable_pressure_drop']
     medium = session['test_medium']
+    holding = bool(session.get('hold_at'))
 
     for ch in session['channels']:
         value = reading.get(f'Ch_{ch}')
@@ -473,21 +502,25 @@ def update_session_from_reading(session, reading):
 
         slot = session['channel_data'][ch]
 
-        if slot['start_pressure'] is None:
+        if holding and slot['hold_index'] is None:   # channel had no reading at Hold click
+            slot['hold_index'] = len(slot['history'])
             slot['start_pressure'] = value
 
         slot['current_pressure'] = value
-        slot['end_pressure'] = value
-        slot['pressure_drop'] = round(
-            (slot['start_pressure'] or 0) - value, 2
-        )
+        if holding:
+            slot['end_pressure'] = value
+            slot['pressure_drop'] = round(slot['start_pressure'] - value, 2)
+        else:
+            slot['end_pressure'] = None
+            slot['pressure_drop'] = None
 
         sample = {
             'timestamp': now.strftime('%Y-%m-%d %H:%M:%S'),
             'elapsed_time': format_elapsed(elapsed_seconds),
             'pressure': value,
             'unit': unit,
-            'status': session['status'],
+            # 'status': session['status'],
+            'status': 'Holding' if holding else session['status'],
             'pressure_drop': slot['pressure_drop'],
             'max_allowable_pressure_drop': max_drop,
             'result': slot['result'],
@@ -553,10 +586,22 @@ def stop_session(reason='Manual Stop'):
         # ---------------------------------------------------------
         overall_result = 'PASS'
         has_valid_test = False
+        held = bool(session.get('hold_at'))
 
         for ch in session['channels']:
             slot = session['channel_data'][ch]
-            hist = slot['history']
+            # hist = slot['history']
+            if not held:                       # Stop pressed without Hold: nothing to evaluate
+                slot['start_pressure'] = None
+                slot['end_pressure'] = None
+                slot['pressure_drop'] = None
+                slot['max_error'] = 0.0
+                slot['relative_error'] = 0.0
+                slot['result'] = 'NO HOLD'
+                overall_result = 'NO HOLD'
+                continue
+
+            hist = test_history(session, ch)   # Hold -> Stop only
 
             # -----------------------------------------------------
             # No valid RVG200 pressure data received
@@ -691,7 +736,8 @@ def generate_report_file(session):
         result_class = 'pass' if slot['result'] == 'PASS' else 'fail'
 
         # --- Time info for this channel's test ---
-        hist = slot['history']
+        # hist = slot['history']
+        hist = test_history(session, ch)
         if hist:
             first = hist[0]
             last = hist[-1]
@@ -772,6 +818,7 @@ def generate_report_file(session):
     for ch in channels:
         slot = session['channel_data'][ch]
         history = slot.get('history', [])
+   
 
         pressures = [
             sample.get('pressure')
@@ -788,6 +835,17 @@ def generate_report_file(session):
         if history:
             pressures = [0] + pressures
 
+                # Hold / Stop markers (index 0 is the zero-anchor point, hence +1)
+        marker = {}
+        if session.get('uses_hold') and slot.get('hold_index') is not None and history:
+            marker = {
+                'holdIdx': slot['hold_index'] + 1,
+                'holdVal': slot['start_pressure'],
+                'stopIdx': len(history),
+                'stopVal': slot['end_pressure'],
+                'unit': unit,
+            }
+
         chart_datasets.append({
             'label': f'CH-{ch}',
             'data': pressures,
@@ -799,6 +857,7 @@ def generate_report_file(session):
             'cubicInterpolationMode': 'monotone',
             'spanGaps': True,
             'fill': False,
+            **marker,
         })
 
     print(
@@ -836,11 +895,14 @@ def generate_report_file(session):
         '<tr><td colspan="7" style="text-align:center;color:#6b7280;padding:16px;">No data.</td></tr>'
 
     duration_text = "00:00:00"
-    if session.get('started_at') and session.get('ended_at'):
+    duration_origin = (
+        session.get('hold_at') if session.get('uses_hold') else session.get('started_at')
+    )
+    if duration_origin and session.get('ended_at'):
         try:
             duration_text = format_elapsed(
                 (datetime.fromisoformat(session['ended_at'])
-                 - datetime.fromisoformat(session['started_at'])).total_seconds()
+                 - datetime.fromisoformat(duration_origin)).total_seconds()
             )
         except Exception:
             pass
@@ -1170,14 +1232,68 @@ console.log("REPORT DATASETS:", datasets);
 datasets.forEach(ds => {
     if (!ds.data || !ds.data.length) return;
     const lastIdx = ds.data.length - 1;
-    ds.pointRadius = ds.data.map((_, i) => i === lastIdx ? 4 : 0);
+    ds.pointRadius = ds.data.map((_, i) => (i === lastIdx || i === ds.holdIdx || i === ds.stopIdx) ? 4 : 0);
     ds.pointBackgroundColor = ds.borderColor;
     ds.pointBorderColor = '#fff';
     ds.pointBorderWidth = 1.5;
 });
 
+/* Value boxes at the Hold point (start pressure) and Stop point (end pressure) */
+const holdStopLabels = {
+    id: 'holdStopLabels',
+    afterDatasetsDraw(chart) {
+        const ctx = chart.ctx, area = chart.chartArea;
+        const items = [];
+
+        chart.data.datasets.forEach((ds, di) => {
+            const meta = chart.getDatasetMeta(di);
+            [['holdIdx', 'holdVal'], ['stopIdx', 'stopVal']].forEach(([iKey, vKey]) => {
+                const idx = ds[iKey], val = ds[vKey];
+                if (idx === undefined || val === null || val === undefined) return;
+                const pt = meta.data[idx];
+                if (!pt) return;
+
+                const text = val + ' ' + String(ds.unit || 'psi').toUpperCase();
+                ctx.save();
+                ctx.font = '10px Arial, sans-serif';
+                const w = ctx.measureText(text).width + 8, h = 15;
+                ctx.restore();
+
+                const gap = 14 + di * 20;                       // stack channels so boxes don't overlap
+                const bx = Math.min(Math.max(pt.x - w / 2, area.left + 2), area.right - w - 2);
+                let by = pt.y - gap - h;
+                if (by < area.top + 2) by = pt.y + gap;         // no room above: draw below
+                items.push({ pt, text, w, h, bx, by, color: ds.borderColor });
+            });
+        });
+
+        ctx.save();
+        ctx.lineWidth = 1;
+        items.forEach(it => {                                   // pass 1: leader lines
+            ctx.strokeStyle = it.color;
+            ctx.beginPath();
+            ctx.moveTo(it.bx + it.w / 2, it.by < it.pt.y ? it.by + it.h : it.by);
+            ctx.lineTo(it.pt.x, it.pt.y);
+            ctx.stroke();
+        });
+        ctx.font = '10px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        items.forEach(it => {                                   // pass 2: value boxes on top
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(it.bx, it.by, it.w, it.h);
+            ctx.strokeStyle = it.color;
+            ctx.strokeRect(it.bx, it.by, it.w, it.h);
+            ctx.fillStyle = '#111827';
+            ctx.fillText(it.text, it.bx + it.w / 2, it.by + it.h / 2 + 0.5);
+        });
+        ctx.restore();
+    }
+};
+
 new Chart(document.getElementById('pressureChart'), {
     type: 'line',
+    plugins: [holdStopLabels],
     data: { labels, datasets },
     options: {
         responsive: true,
@@ -1413,23 +1529,50 @@ def api_start():
         state['thread'] = threading.Thread(target=monitoring_loop, daemon=True)
         state['thread'].start()
 
-        test_duration = session.get('test_duration', 0)
-        if test_duration > 0:
-            timer = threading.Timer(
-                test_duration,
-                automatic_stop_session,
-                args=(session['session_id'],),
-            )
-            timer.daemon = True
-            session['timer'] = timer
-            timer.start()
-
     return jsonify({
         'status': 'started',
         'session_id': session['session_id'],
         'channels': session['channels'],
         'test_duration': session['test_duration'],
     })
+
+@app.route('/api/hold', methods=['POST'])
+def api_hold():
+    with state_lock:
+        session = state['session']
+        if not session or not state['running'] or session['status'] != 'Running':
+            return jsonify({'error': 'No running test to hold.'}), 400
+        if session.get('hold_at'):
+            return jsonify({'error': 'Hold has already been applied.'}), 400
+
+        session['hold_at'] = datetime.now().isoformat(timespec='seconds')
+
+        for ch in session['channels']:
+            slot = session['channel_data'][ch]
+            hist = slot['history']
+            if hist:
+                slot['hold_index'] = len(hist) - 1
+                slot['start_pressure'] = hist[-1]['pressure']
+                slot['end_pressure'] = hist[-1]['pressure']
+                slot['pressure_drop'] = 0.0
+                hist[-1]['pressure_drop'] = 0.0
+                hist[-1]['status'] = 'Holding'
+
+        first = session['channel_data'][session['channels'][0]]
+        session['start_pressure'] = first['start_pressure']
+        session['end_pressure'] = first['end_pressure']
+        session['pressure_drop'] = first['pressure_drop']
+
+        test_duration = session.get('test_duration', 0)
+        if test_duration > 0:                      # auto-stop now counts from Hold
+            timer = threading.Timer(test_duration, automatic_stop_session,
+                                    args=(session['session_id'],))
+            timer.daemon = True
+            session['timer'] = timer
+            timer.start()
+
+        hold_at = session['hold_at']
+    return jsonify({'status': 'holding', 'hold_at': hold_at})
 
 
 @app.route('/api/stop', methods=['POST'])

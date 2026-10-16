@@ -442,7 +442,7 @@
             gap: 10px;
         }
 
-        .action-main { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+        .action-main { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 10px; }
         .action-main button { min-height: 44px; font-size: 0.95rem; }
 
         .action-secondary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -892,6 +892,7 @@
         <div class="sidebar-actions">
             <div class="action-main">
                 <button class="primary" id="startBtn">Start Test</button>
+                <button class="secondary" id="holdBtn" disabled>Hold</button>
                 <button class="danger" id="stopBtn" disabled>Stop Test</button>
             </div>
             <div class="action-secondary">
@@ -1001,6 +1002,7 @@ const activeCount      = document.getElementById('activeCount');
 const chartUnitLabel   = document.getElementById('chartUnitLabel');
 const summaryList      = document.getElementById('channelSummaryList');
 const startBtn         = document.getElementById('startBtn');
+const holdBtn = document.getElementById('holdBtn');
 const stopBtn          = document.getElementById('stopBtn');
 const timerBox     = document.getElementById('timer');
 const timerElapsed = document.getElementById('timerElapsed');
@@ -1355,7 +1357,8 @@ function renderTimer(data) {
     timerFill.style.width = total > 0 ? `${Math.min(100, (elapsed / total) * 100)}%` : '0%';
     timerBox.title = total > 0 ? `Remaining ${hhmmss(total - elapsed)}` : 'Elapsed test time';
 
-    timerBox.classList.toggle('is-running', running);
+    // timerBox.classList.toggle('is-running', running);
+    timerBox.classList.toggle('is-running', running && Boolean(data.hold_at));
     timerBox.classList.toggle('is-done', hasSession && !running);
 }
 
@@ -1369,13 +1372,20 @@ async function fetchState() {
         const data = await res.json();
         if (!data) return;
 
+        // isRunning = Boolean(data.running);
+        // startBtn.disabled = isRunning;
+        // stopBtn.disabled = !isRunning;
+        // lockConnInputs();
+
+        // setStatus(data.status || 'Idle', isRunning);
+        // setStatus(data.status || 'Idle', isRunning);
         isRunning = Boolean(data.running);
         startBtn.disabled = isRunning;
+        holdBtn.disabled = !isRunning || Boolean(data.hold_at);
         stopBtn.disabled = !isRunning;
         lockConnInputs();
 
-        setStatus(data.status || 'Idle', isRunning);
-        setStatus(data.status || 'Idle', isRunning);
+        setStatus(data.phase || data.status || 'Idle', isRunning);
         lastState = data;       // <-- add
         renderTimer(data);      // <-- add
 
@@ -1432,6 +1442,7 @@ async function startTest() {
     };
 
     startBtn.disabled = true;
+    holdBtn.disabled = false;
     stopBtn.disabled = false;
 
     try {
@@ -1444,6 +1455,7 @@ async function startTest() {
         if (data.error) {
             alert(data.error);
             startBtn.disabled = false;
+            holdBtn.disabled = true;
             stopBtn.disabled = true;
             return;
         }
@@ -1452,6 +1464,19 @@ async function startTest() {
         alert('Failed to start test: ' + err.message);
         startBtn.disabled = false;
         stopBtn.disabled = true;
+    }
+}
+
+async function holdTest() {
+    holdBtn.disabled = true;
+    try {
+        const res = await fetch('/api/hold', { method: 'POST' });
+        const data = await res.json();
+        if (data.error) alert(data.error);
+        await fetchState();
+    } catch (err) {
+        alert('Failed to apply hold: ' + err.message);
+        holdBtn.disabled = false;
     }
 }
 
@@ -1621,6 +1646,7 @@ stopBtn.addEventListener('click', stopTest);
 document.getElementById('importBtn').addEventListener('click', importCsv);
 document.getElementById('exportBtn').addEventListener('click', exportCsv);
 document.getElementById('reportBtn').addEventListener('click', openReport);
+holdBtn.addEventListener('click', holdTest);
 
 document.getElementById('testDate').value = new Date().toISOString().slice(0, 10);
 document.getElementById('testDuration').addEventListener('input', () => renderTimer(lastState));
