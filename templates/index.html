@@ -367,6 +367,20 @@
 
         .channel-chip.active .ch-dot { background: var(--c, var(--brand)); }
 
+        .channel-chip .ch-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; }
+        .channel-chip .ch-unit { font-size: 0.7rem; font-weight: 500; color: var(--muted); }
+
+        .unit-popup {
+            position: fixed; z-index: 1000;
+            min-width: 150px; padding: 10px;
+            display: flex; flex-direction: column; gap: 8px;
+            background: var(--surface);
+            border: 1px solid var(--line-strong);
+            border-radius: var(--radius-sm);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+        }
+        .unit-popup label { font-size: 0.75rem; font-weight: 600; color: var(--muted); }
+
         .channel-tools { display: flex; gap: 8px; margin-top: 10px; }
 
         .small-btn {
@@ -793,15 +807,6 @@
                 <summary>Test Settings</summary>
                 <div class="section-body">
                     <div class="form-grid">
-                        <div class="field">
-                            <label for="unit">Engineering Unit</label>
-                            <select id="unit">
-                                <option value="psi" selected>psi</option>
-                                <option value="bar">bar</option>
-                                <option value="kPa">kPa</option>
-                                <option value="MPa">MPa</option>
-                            </select>
-                        </div>
 
                         <div class="field">
                             <label for="testMedium">Test Medium</label>
@@ -1025,6 +1030,11 @@ const timerFill    = document.getElementById('timerFill');
    ============================================================ */
 let selectedChannels = new Set([1]); // default: Ch1 selected
 let isRunning = false;
+const UNIT_OPTIONS = ['psi', 'bar', 'kPa', 'MPa'];
+const channelUnits = {};                       // { 1: 'psi', 2: 'bar', ... }
+const unitOf = ch => channelUnits[ch] || 'psi';
+let unitPopup = null;
+
 
 /* Display helpers (presentation only) */
 const fmt2 = v => (v !== null && v !== undefined) ? Number(v).toFixed(2) : '--';
@@ -1053,25 +1063,71 @@ function renderChannelGrid() {
         chip.style.setProperty('--c', chColor(ch));
         chip.innerHTML = `
             <span class="ch-dot"></span>
-            <span>CH-${ch}</span>
+            <span class="ch-text">
+                <span class="ch-label">CH-${ch}</span>
+                <span class="ch-unit">${unitOf(ch)}</span>
+            </span>
             <input type="checkbox" ${selectedChannels.has(ch) ? 'checked' : ''}>
         `;
         chip.addEventListener('click', (e) => {
             e.preventDefault();
             if (isRunning) return;
-            if (selectedChannels.has(ch)) {
-                selectedChannels.delete(ch);
-            } else {
+            if (!selectedChannels.has(ch)) {          // first click selects, as before
                 selectedChannels.add(ch);
+                renderChannelGrid();
+                renderRatingInputs();
+                updateActiveCount();
+                updateDescription();
+                return;
             }
-            renderChannelGrid();
-            renderRatingInputs();
-            updateActiveCount();
-            updateDescription();
+            openUnitPopup(ch, chip);                  // selected channel -> unit popup
         });
         channelGrid.appendChild(chip);
     }
 }
+
+function closeUnitPopup() {
+    if (unitPopup) { unitPopup.remove(); unitPopup = null; }
+}
+
+function openUnitPopup(ch, anchor) {
+    closeUnitPopup();
+    unitPopup = document.createElement('div');
+    unitPopup.className = 'unit-popup';
+    unitPopup.innerHTML = `
+        <label for="unitSelect_${ch}">CH-${ch} unit</label>
+        <select id="unitSelect_${ch}">
+            ${UNIT_OPTIONS.map(u =>
+                `<option value="${u}" ${u === unitOf(ch) ? 'selected' : ''}>${u}</option>`).join('')}
+        </select>
+        <button type="button" class="small-btn" id="unitDeselectBtn">Deselect channel</button>
+    `;
+    document.body.appendChild(unitPopup);
+
+    const r = anchor.getBoundingClientRect();
+    unitPopup.style.top  = (r.bottom + 6) + 'px';
+    unitPopup.style.left = Math.max(8, Math.min(r.left, window.innerWidth - unitPopup.offsetWidth - 8)) + 'px';
+
+    unitPopup.querySelector('select').addEventListener('change', e => {
+        channelUnits[ch] = e.target.value;
+        closeUnitPopup();
+        renderChannelGrid();                          // unit now shows under the label
+    });
+    unitPopup.querySelector('#unitDeselectBtn').addEventListener('click', () => {
+        selectedChannels.delete(ch);
+        closeUnitPopup();
+        renderChannelGrid();
+        renderRatingInputs();
+        updateActiveCount();
+        updateDescription();
+    });
+}
+
+document.addEventListener('mousedown', e => {
+    if (unitPopup && !unitPopup.contains(e.target)) closeUnitPopup();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeUnitPopup(); });
+window.addEventListener('scroll', closeUnitPopup, true);
 
 function updateDescription() {
                 const sorted = [...selectedChannels].sort((a, b) => a - b);
@@ -1201,6 +1257,7 @@ function renderChannelCards(data) {
         const drop = slot.pressure_drop;
         const result = slot.result || 'Pending';
         const color = chColor(ch);
+        const chUnit = slot.unit || unit;
 
         return `
             <div class="ch-card" style="--c:${color};">
@@ -1211,11 +1268,11 @@ function renderChannelCards(data) {
                 <div class="metric-label">Current pressure</div>
                 <div class="metric-value">
                     ${fmt2(current)}
-                    <span class="metric-unit">${unit}</span>
+                    <span class="metric-unit">${chUnit}</span>
                 </div>
                 <div class="ch-footer">
-                    <div><span class="k">Drop</span><span class="v">${fmt2(drop)} ${unit}</span></div>
-                    <div><span class="k">Start</span><span class="v">${fmt2(slot.start_pressure)} ${unit}</span></div>
+                    <div><span class="k">Drop</span><span class="v">${fmt2(drop)} ${chUnit}</span></div>
+                    <div><span class="k">Start</span><span class="v">${fmt2(slot.start_pressure)} ${chUnit}</span></div>
                 </div>
             </div>
         `;
@@ -1230,8 +1287,10 @@ function renderChart(data) {
     const channelData = data.channel_data || {};
     const unit = data.session_data?.unit || 'psi';
 
-    chartUnitLabel.textContent = unit;
-    chart.options.scales.y.title.text = `Pressure (${unit})`;
+    const units = [...new Set(channels.map(ch => channelData[String(ch)]?.unit || unit))];
+    const axisUnit = units.length === 1 ? units[0] : 'mixed units';
+    chartUnitLabel.textContent = axisUnit;
+    chart.options.scales.y.title.text = `Pressure (${axisUnit})`;
 
     // Build a common time axis from the longest channel
     let labels = [];
@@ -1317,6 +1376,7 @@ function renderSummary(data) {
         const end = slot.end_pressure;
         const drop = slot.pressure_drop;
         const result = slot.result || 'Pending';
+        const chUnit = slot.unit || unit;
         return `
             <li style="--c:${chColor(ch)};">
                 <div class="summary-top">
@@ -1324,9 +1384,9 @@ function renderSummary(data) {
                     <span class="result-badge ${resultClass(result)}">${result}</span>
                 </div>
                 <div class="summary-stats">
-                    <div><span class="k">Start</span><span class="v">${fmt2(start)} <span class="u">${unit}</span></span></div>
-                    <div><span class="k">End</span><span class="v">${fmt2(end)} <span class="u">${unit}</span></span></div>
-                    <div><span class="k">Drop</span><span class="v">${fmt2(drop)} <span class="u">${unit}</span></span></div>
+                    <div><span class="k">Start</span><span class="v">${fmt2(start)} <span class="u">${chUnit}</span></span></div>
+                    <div><span class="k">End</span><span class="v">${fmt2(end)} <span class="u">${chUnit}</span></span></div>
+                    <div><span class="k">Drop</span><span class="v">${fmt2(drop)} <span class="u">${chUnit}</span></span></div>
                 </div>
             </li>
         `;
@@ -1449,7 +1509,8 @@ async function startTest() {
         channels: channels,
         input_ratings: inputRatings,
 
-        unit: document.getElementById('unit').value,
+        unit: unitOf(channels[0]),    // session-level fallback
+        channel_units: Object.fromEntries(channels.map(ch => [String(ch), unitOf(ch)])),
         test_medium: document.getElementById('testMedium').value,
         test_duration_minutes: Number(document.getElementById('testDuration').value || 0),
         sample_interval: Number(document.getElementById('sampleInterval').value || 1),
@@ -1546,8 +1607,56 @@ document.getElementById('csvFileInput').addEventListener('change', async functio
     this.value = '';
 });
 
-function exportCsv() {
-    window.location.href = '/api/export_csv';
+async function exportCsv() {
+    let blob, suggestedName = 'pressure_log.csv';
+
+    // 1. Get the file from the server (same endpoint, same content)
+    try {
+        const res = await fetch('/api/export_csv');
+        if (!res.ok) {
+            let msg = 'Failed to export CSV.';
+            try { msg = (await res.json()).error || msg; } catch (_) {}
+            alert(msg);
+            return;
+        }
+        const cd = res.headers.get('Content-Disposition') || '';
+        const m = cd.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+        if (m) suggestedName = decodeURIComponent(m[1]);
+        blob = await res.blob();
+    } catch (err) {
+        alert('Failed to export CSV: ' + err.message);
+        return;
+    }
+
+    // 2. Open the Save As dialog so the user picks the folder and file name
+    if (window.showSaveFilePicker) {
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: suggestedName,
+                types: [{
+                    description: 'CSV file (opens in Excel)',
+                    accept: { 'text/csv': ['.csv'] }
+                }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            return;
+        } catch (err) {
+            if (err && err.name === 'AbortError') return;   // user cancelled: save nothing
+            console.warn('Save dialog unavailable, using normal download:', err);
+        }
+    }
+
+    // 3. Fallback for browsers/contexts without the Save As API
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = suggestedName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function openReport() {

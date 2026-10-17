@@ -200,47 +200,71 @@ def append_archive_csv(data):
         print(f"[ARCHIVE WARN] {exc}")
 
 
-def write_session_log(session, row):
-    """Append one sample row (with Channel column) to the combined CSV."""
-    file_exists = os.path.isfile(session['log_file'])
-    fieldnames = [
-        'Timestamp',
-        'Elapsed Time',
-        'Channel',
-        'Pressure',
-        'Unit',
-        'Test Status',
-        'Pressure Drop',
-        'Max Allowable Pressure Drop',
-        'Result',
-        'Medium',
-    ]
+def log_fieldnames(channels):
+    """Wide layout: one column per channel for pressure, unit, drop and result."""
+    fields = ['Timestamp', 'Elapsed Time']
+    fields += [f'CH-{c} Pressure' for c in channels]
+    fields += [f'CH-{c} Unit' for c in channels]
+    fields.append('Test Status')
+    fields += [f'CH-{c} Pressure Drop' for c in channels]
+    fields.append('Max Allowable Pressure Drop')
+    fields += [f'CH-{c} Result' for c in channels]
+    fields.append('Medium')
+    return fields
 
+
+def build_log_row(channels, samples):
+    """samples: {channel: sample_dict} for ONE reading -> one CSV row."""
+    first = next(iter(samples.values()))
+    row = {
+        'Timestamp': first['timestamp'],
+        'Elapsed Time': first['elapsed_time'],
+        'Test Status': first['status'],
+        'Max Allowable Pressure Drop': first['max_allowable_pressure_drop'],
+        'Medium': first['medium'],
+    }
+    for ch in channels:
+        s = samples.get(ch)
+        row[f'CH-{ch} Pressure'] = s['pressure'] if s else ''
+        row[f'CH-{ch} Unit'] = s['unit'] if s else ''
+        row[f'CH-{ch} Pressure Drop'] = (
+            s['pressure_drop'] if s and s['pressure_drop'] is not None else ''
+        )
+        row[f'CH-{ch} Result'] = s['result'] if s else ''
+    return row
+
+
+# def write_session_log(session, row):
+#     """Append one sample row (with Channel column) to the combined CSV."""
+#     file_exists = os.path.isfile(session['log_file'])
+#     fieldnames = [
+#         'Timestamp',
+#         'Elapsed Time',
+#         'Channel',
+#         'Pressure',
+#         'Unit',
+#         'Test Status',
+#         'Pressure Drop',
+#         'Max Allowable Pressure Drop',
+#         'Result',
+#         'Medium',
+#     ]
+
+#     with open(session['log_file'], 'a', newline='') as f:
+#         writer = csv.DictWriter(f, fieldnames=fieldnames)
+#         if not file_exists:
+#             writer.writeheader()
+#         writer.writerow(row)
+def write_session_log(session, row):
+    """Append one reading (all channels side by side) to the session CSV."""
+    file_exists = os.path.isfile(session['log_file'])
     with open(session['log_file'], 'a', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=log_fieldnames(session['channels']))
         if not file_exists:
             writer.writeheader()
         writer.writerow(row)
 
 
-# ---------------------------------------------------------------------------
-# Modbus
-# ---------------------------------------------------------------------------
-# def read_abb_data():
-#     """Read all 6 channels from the ABB RVG 200."""
-#     client = ModbusTcpClient(IP_ADDRESS, port=PORT, timeout=3)
-#     readings = {}
-
-#     if not client.connect():
-#         return None
-
-#     try:
-#         for channel in range(1, TOTAL_CHANNELS + 1):
-#             start_addr = (channel - 1) * 2
-#             try:
-#                 response = client.read_holding_registers(
-#                     address=start_addr, count=2, device_id=DEVICE_ID
-#                 )
 def read_abb_data():
     """Read all 6 channels from the ABB RVG 200."""
     cfg = get_settings()
@@ -311,6 +335,9 @@ def create_session(config):
         except Exception:
             input_ratings = {}
 
+    channel_units = config.get('channel_units') or {}
+    default_unit = config.get('unit', 'psi')
+
     channel_data = {}
     for ch in channels:
         channel_data[ch] = {
@@ -325,6 +352,7 @@ def create_session(config):
             'input_full_scale': str(
                 input_ratings.get(str(ch), input_ratings.get(ch, '20K'))
             ),
+            'unit': str(channel_units.get(str(ch), default_unit)),
             'max_error': 0.0,
             'relative_error': 0.0,
         }
@@ -376,15 +404,19 @@ def create_session(config):
     }
 
     # Create CSV header
+    # with open(session['log_file'], 'w', newline='') as f:
+    #     writer = csv.DictWriter(
+    #         f,
+    #         fieldnames=[
+    #             'Timestamp', 'Elapsed Time', 'Channel', 'Pressure', 'Unit',
+    #             'Test Status', 'Pressure Drop',
+    #             'Max Allowable Pressure Drop', 'Result', 'Medium',
+    #         ],
+    #     )
+    #     writer.writeheader()
+        # Create CSV header
     with open(session['log_file'], 'w', newline='') as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=[
-                'Timestamp', 'Elapsed Time', 'Channel', 'Pressure', 'Unit',
-                'Test Status', 'Pressure Drop',
-                'Max Allowable Pressure Drop', 'Result', 'Medium',
-            ],
-        )
+        writer = csv.DictWriter(f, fieldnames=log_fieldnames(session['channels']))
         writer.writeheader()
 
     return session
@@ -427,6 +459,7 @@ def payload_for_session(session):
 
     # Flat history for frontend (with Channel column)
     flat_history = []
+    samples = {}
     for ch in session['channels']:
         for sample in session['channel_data'][ch]['history']:
             row = dict(sample)
@@ -450,6 +483,7 @@ def payload_for_session(session):
                 'pressure_drop': d['pressure_drop'],
                 'result': d['result'],
                 'input_full_scale': d['input_full_scale'],
+                'unit': d.get('unit', session['unit']),
                 'max_error': d['max_error'],
                 'relative_error': d['relative_error'],
                 'history': d['history'],
@@ -518,8 +552,7 @@ def update_session_from_reading(session, reading):
             'timestamp': now.strftime('%Y-%m-%d %H:%M:%S'),
             'elapsed_time': format_elapsed(elapsed_seconds),
             'pressure': value,
-            'unit': unit,
-            # 'status': session['status'],
+            'unit': slot.get('unit', unit),
             'status': 'Holding' if holding else session['status'],
             'pressure_drop': slot['pressure_drop'],
             'max_allowable_pressure_drop': max_drop,
@@ -528,6 +561,7 @@ def update_session_from_reading(session, reading):
         }
 
         slot['history'].append(sample)
+        samples[ch] = sample    
 
         write_session_log(session, {
             'Timestamp': sample['timestamp'],
@@ -541,6 +575,9 @@ def update_session_from_reading(session, reading):
             'Result': sample['result'],
             'Medium': sample['medium'],
         })
+
+    if samples:                        # <-- one row per reading, after the loop
+        write_session_log(session, build_log_row(session['channels'], samples))
 
     # Update session-level summary (based on first channel)
     first_ch = session['channels'][0]
@@ -1618,6 +1655,51 @@ def api_state():
     return jsonify(payload)
 
 
+# @app.route('/api/export_csv')
+# def api_export_csv():
+#     with state_lock:
+#         session = state['session']
+
+#     if not session:
+#         return jsonify({'error': 'No test data available.'}), 400
+
+#     # Rebuild CSV from in-memory history (safer than reading the file mid-write)
+#     output = io.StringIO()
+#     fieldnames = [
+#         'Timestamp', 'Elapsed Time', 'Channel', 'Pressure', 'Unit',
+#         'Test Status', 'Pressure Drop',
+#         'Max Allowable Pressure Drop', 'Result', 'Medium',
+#     ]
+#     writer = csv.DictWriter(output, fieldnames=fieldnames)
+#     writer.writeheader()
+
+#     combined = []
+#     for ch in session['channels']:
+#         for s in session['channel_data'][ch]['history']:
+#             combined.append((s['timestamp'], ch, s))
+#     combined.sort(key=lambda r: r[0])
+
+#     for ts, ch, s in combined:
+#         writer.writerow({
+#             'Timestamp': s.get('timestamp', ''),
+#             'Elapsed Time': s.get('elapsed_time', ''),
+#             'Channel': ch,
+#             'Pressure': s.get('pressure', ''),
+#             'Unit': s.get('unit', ''),
+#             'Test Status': s.get('status', ''),
+#             'Pressure Drop': s.get('pressure_drop', ''),
+#             'Max Allowable Pressure Drop': s.get('max_allowable_pressure_drop', ''),
+#             'Result': s.get('result', ''),
+#             'Medium': s.get('medium', ''),
+#         })
+
+#     output.seek(0)
+#     return send_file(
+#         io.BytesIO(output.getvalue().encode('utf-8-sig')),
+#         mimetype='text/csv',
+#         as_attachment=True,
+#         download_name=f"{session['session_id']}_log.csv",
+#     )
 @app.route('/api/export_csv')
 def api_export_csv():
     with state_lock:
@@ -1626,35 +1708,24 @@ def api_export_csv():
     if not session:
         return jsonify({'error': 'No test data available.'}), 400
 
-    # Rebuild CSV from in-memory history (safer than reading the file mid-write)
-    output = io.StringIO()
-    fieldnames = [
-        'Timestamp', 'Elapsed Time', 'Channel', 'Pressure', 'Unit',
-        'Test Status', 'Pressure Drop',
-        'Max Allowable Pressure Drop', 'Result', 'Medium',
-    ]
-    writer = csv.DictWriter(output, fieldnames=fieldnames)
-    writer.writeheader()
+    channels = session['channels']
 
-    combined = []
-    for ch in session['channels']:
+    # Group samples taken at the same moment into one row
+    # (n handles two readings landing in the same second)
+    groups = {}
+    for ch in channels:
+        seen = {}
         for s in session['channel_data'][ch]['history']:
-            combined.append((s['timestamp'], ch, s))
-    combined.sort(key=lambda r: r[0])
+            key = (s['timestamp'], s['elapsed_time'])
+            n = seen.get(key, 0)
+            seen[key] = n + 1
+            groups.setdefault((s['timestamp'], n, s['elapsed_time']), {})[ch] = s
 
-    for ts, ch, s in combined:
-        writer.writerow({
-            'Timestamp': s.get('timestamp', ''),
-            'Elapsed Time': s.get('elapsed_time', ''),
-            'Channel': ch,
-            'Pressure': s.get('pressure', ''),
-            'Unit': s.get('unit', ''),
-            'Test Status': s.get('status', ''),
-            'Pressure Drop': s.get('pressure_drop', ''),
-            'Max Allowable Pressure Drop': s.get('max_allowable_pressure_drop', ''),
-            'Result': s.get('result', ''),
-            'Medium': s.get('medium', ''),
-        })
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=log_fieldnames(channels))
+    writer.writeheader()
+    for key in sorted(groups, key=lambda k: (k[0], k[1])):
+        writer.writerow(build_log_row(channels, groups[key]))
 
     output.seek(0)
     return send_file(
@@ -1663,6 +1734,7 @@ def api_export_csv():
         as_attachment=True,
         download_name=f"{session['session_id']}_log.csv",
     )
+
 
 
 @app.route('/api/import_csv', methods=['POST'])
@@ -1678,6 +1750,32 @@ def api_import_csv():
     try:
         content = file.read().decode('utf-8-sig')
         reader = csv.DictReader(io.StringIO(content))
+        fieldnames = reader.fieldnames or []
+
+        if 'Channel' in fieldnames:                 # old long format
+            rows = list(reader)
+        else:                                       # new side-by-side format
+            ch_nums = sorted(
+                int(m.group(1)) for m in
+                (re.match(r'^CH-(\d+) Pressure$', h) for h in fieldnames) if m
+            )
+            rows = []
+            for r in reader:
+                for n in ch_nums:
+                    if not (r.get(f'CH-{n} Pressure') or '').strip():
+                        continue
+                    rows.append({
+                        'Timestamp': r.get('Timestamp', ''),
+                        'Elapsed Time': r.get('Elapsed Time', '00:00:00'),
+                        'Channel': str(n),
+                        'Pressure': r.get(f'CH-{n} Pressure', ''),
+                        'Unit': r.get(f'CH-{n} Unit', ''),
+                        'Test Status': r.get('Test Status', 'Completed'),
+                        'Pressure Drop': r.get(f'CH-{n} Pressure Drop', ''),
+                        'Max Allowable Pressure Drop': r.get('Max Allowable Pressure Drop', ''),
+                        'Result': r.get(f'CH-{n} Result', 'Pending'),
+                        'Medium': r.get('Medium', ''),
+                    })
 
         per_channel = {}
         unit = 'psi'
@@ -1686,7 +1784,7 @@ def api_import_csv():
         first_ts = None
         last_ts = None
 
-        for row in reader:
+        for row in rows:
             try:
                 ch = int(row.get('Channel', '1'))
             except ValueError:
