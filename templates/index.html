@@ -659,6 +659,16 @@
         .conn-msg.err { color: var(--bad); }
         .conn-msg.info { color: var(--muted); }
 
+        .reset-btn {
+            min-height: 36px;
+            padding: 0 14px;
+            font-size: 0.85rem;
+            background: #17263d;
+            color: #d5deec;
+            border-color: #2b3f5e;
+        }
+        .reset-btn:hover:not(:disabled) { background: #1e3250; border-color: #3d5683; }
+
         /* ============================================================
            RESPONSIVE
            ============================================================ */
@@ -715,6 +725,7 @@
         </div>
     </div>
     <div class="topbar-right">
+    <button class="reset-btn" id="resetBtn" type="button" title="Clear the current test and start fresh">Reset</button>
     <div class="timer" id="timer" title="Elapsed test time">
         <div class="timer-row">
             <span class="timer-elapsed" id="timerElapsed">00:00:00</span>
@@ -1402,6 +1413,21 @@ async function fetchState() {
     }
 }
 
+async function resetTest() {
+    if (lastState && lastState.session_id) {
+        if (!confirm('Clear all data from the current test and reset the dashboard?')) return;
+    }
+    resetBtn.disabled = true;
+    try {
+        await fetch('/api/reset', { method: 'POST' });
+        await fetchState();          // redraw immediately instead of waiting for the next poll
+    } catch (err) {
+        console.error('resetTest failed:', err);
+        alert('Could not reset the dashboard.');
+    }
+    resetBtn.disabled = false;
+}
+
 /* ============================================================
    START / STOP
    ============================================================ */
@@ -1547,6 +1573,7 @@ const instDeviceId = document.getElementById('instDeviceId');
 const connMsg      = document.getElementById('connMsg');
 const saveConnBtn  = document.getElementById('saveConnBtn');
 const testConnBtn  = document.getElementById('testConnBtn');
+const resetBtn = document.getElementById('resetBtn');
 
 function setConnMsg(text, kind) {
     connMsg.textContent = text || '';
@@ -1641,6 +1668,7 @@ document.getElementById('clearAllBtn').addEventListener('click', () => {
     updateDescription();
 });
 
+resetBtn.addEventListener('click', resetTest);
 startBtn.addEventListener('click', startTest);
 stopBtn.addEventListener('click', stopTest);
 document.getElementById('importBtn').addEventListener('click', importCsv);

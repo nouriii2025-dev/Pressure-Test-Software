@@ -1303,10 +1303,10 @@ new Chart(document.getElementById('pressureChart'), {
                 position: 'top',
                 align: 'start',
                 labels: {
-                    boxWidth: 22,
-                    boxHeight: 2,
+                    boxWidth: 10,
+                    boxHeight: 10,
                     usePointStyle: true,
-                    pointStyle: 'line',
+                    pointStyle: 'rect',
                     font: { size: 11 },
                     padding: 12
                 }
@@ -1582,6 +1582,32 @@ def api_stop():
         'status': 'stopped',
         'session_id': session['session_id'] if session else None,
     })
+
+
+@app.route('/api/reset', methods=['POST'])
+def api_reset():
+    with state_lock:
+        session = state['session']
+        thread = state.get('thread')
+
+        if session is not None:
+            timer = session.get('timer')
+            if timer is not None:
+                try:
+                    timer.cancel()
+                except Exception:
+                    pass
+                session['timer'] = None
+
+        state['running'] = False      # monitoring_loop exits on its next check
+        state['session'] = None       # drops samples, hold time, results
+        state['error'] = None
+        state['thread'] = None
+
+    if thread is not None and thread.is_alive():
+        thread.join(timeout=2)        # outside the lock so the loop can finish
+
+    return jsonify({'status': 'reset'})
 
 
 @app.route('/api/state')
