@@ -811,9 +811,6 @@ def generate_report_file(session):
             for sample in session['channel_data'][longest_channel]['history']
         ]
 
-    if labels:
-        labels = ['0:00:00'] + labels
-
     # Create one dataset for EVERY selected channel
     for ch in channels:
         slot = session['channel_data'][ch]
@@ -832,16 +829,16 @@ def generate_report_file(session):
                 [None] * (max_labels - len(pressures))
             )
 
-        if history:
-            pressures = [0] + pressures
+        # if history:
+        #     pressures = [0] + pressures
 
                 # Hold / Stop markers (index 0 is the zero-anchor point, hence +1)
         marker = {}
         if session.get('uses_hold') and slot.get('hold_index') is not None and history:
             marker = {
-                'holdIdx': slot['hold_index'] + 1,
+                'holdIdx': slot['hold_index'],     
                 'holdVal': slot['start_pressure'],
-                'stopIdx': len(history),
+                'stopIdx': len(history) - 1, 
                 'stopVal': slot['end_pressure'],
                 'unit': unit,
             }
@@ -1341,8 +1338,7 @@ new Chart(document.getElementById('pressureChart'), {
             },
 
             y: {
-                min: 0,
-                beginAtZero: true,
+                beginAtZero: false,
                 grace: '5%',
                 grid: {
                     color: '#e5e7eb'

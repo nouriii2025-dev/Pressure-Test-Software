@@ -876,12 +876,12 @@
 
                         <div class="field">
                             <label for="jde">JDE</label>
-                            <input id="jde" type="text" value="2867002" />
+                            <input id="jde" type="text"/>
                         </div>
 
                         <div class="field">
                             <label for="documents">Documents</label>
-                            <input id="documents" type="text" value="D001130925" />
+                            <input id="documents" type="text"/>
                         </div>
                     </div>
                 </div>
@@ -1144,8 +1144,8 @@ const chart = new Chart(document.getElementById('pressureChart'), {
                 title: { display: true, text: 'Elapsed Time', color: '#66758a', font: { size: 11, weight: '500' } }
             },
             y: {
-                min: 0,
-                beginAtZero: true,
+                beginAtZero: false,
+                grace: '5%',
                 ticks: { color: '#66758a', font: { size: 11 } },
                 grid: { color: '#e6ebf1' },
                 border: { display: false },
@@ -1234,14 +1234,14 @@ function renderChart(data) {
     });
 
     // Anchor every line at zero at t = 0
-    if (labels.length) labels = ['0:00:00', ...labels];
+    //if (labels.length) labels = ['0:00:00', ...labels];
 
     const datasets = channels.map((ch, idx) => {
         const hist = channelData[String(ch)]?.history || [];
         const pressures = hist.map(s => s.pressure);
         return {
             label: `CH-${ch}`,
-            data: pressures.length ? [0, ...pressures] : [],
+            data: pressures,
             borderColor: CHANNEL_COLORS[(ch - 1) % CHANNEL_COLORS.length],
             backgroundColor: 'transparent',
             borderWidth: 2,
