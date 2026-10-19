@@ -683,6 +683,51 @@
         }
         .reset-btn:hover:not(:disabled) { background: #1e3250; border-color: #3d5683; }
 
+        /* Read button + readout popover (top bar) */
+        .read-wrap { position: relative; display: inline-flex; }
+        .read-btn {
+            min-height: 36px;
+            padding: 0 14px;
+            font-size: 0.85rem;
+            background: #17263d;
+            color: #d5deec;
+            border-color: #2b3f5e;
+        }
+        .read-btn:hover:not(:disabled) { background: #1e3250; border-color: #3d5683; }
+        .read-pop {
+            position: absolute; top: calc(100% + 10px); right: 0;
+            z-index: 40; min-width: 260px; max-width: 92vw;
+            padding: 12px 14px 12px;
+            background: var(--surface); color: var(--ink);
+            border: 1px solid var(--line); border-radius: var(--radius-lg);
+            box-shadow: 0 12px 28px -8px rgba(18, 28, 43, 0.35);
+        }
+        .read-pop[hidden] { display: none; }
+        .read-pop-head {
+            display: flex; justify-content: space-between; align-items: center;
+            gap: 12px; margin-bottom: 8px;
+            font-size: 0.78rem; color: var(--muted);
+        }
+        .read-pop-head strong { color: var(--ink); font-size: 0.85rem; }
+        .read-pop-close {
+            border: 0; background: transparent; color: var(--muted);
+            font-size: 1.1rem; line-height: 1; cursor: pointer; padding: 0 2px;
+        }
+        .read-row {
+            display: flex; justify-content: space-between; align-items: baseline;
+            padding: 7px 0; border-top: 1px solid var(--line);
+        }
+        .read-row .rc { font-weight: 700; font-size: 0.85rem; }
+        .read-row .rc i {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            margin-right: 7px; background: var(--c, var(--brand));
+        }
+        .read-row .rv { font-weight: 600; font-size: 1.05rem; }
+        .read-row .rv small { color: var(--muted); font-weight: 500; font-size: 0.78rem; margin-left: 4px; }
+        .read-msg { font-size: 0.82rem; padding: 4px 0; }
+        .read-msg.err { color: var(--bad); }
+        .read-msg.info { color: var(--muted); }
+
         /* ============================================================
            RESPONSIVE
            ============================================================ */
@@ -739,6 +784,10 @@
         </div>
     </div>
     <div class="topbar-right">
+    <div class="read-wrap">
+        <button class="read-btn" id="readBtn" type="button" title="Read the current pressure of the selected channels (does not start a test)">Read</button>
+    <div class="read-pop" id="readPop" role="status" aria-live="polite" hidden></div>
+    </div>
     <button class="reset-btn" id="resetBtn" type="button" title="Clear the current test and start fresh">Reset</button>
     <div class="timer" id="timer" title="Elapsed test time">
         <div class="timer-row">
@@ -1776,6 +1825,66 @@ document.getElementById('clearAllBtn').addEventListener('click', () => {
     updateActiveCount();
     updateDescription();
 });
+
+/* ============================================================
+   READ (read-only snapshot of selected channels; no test actions)
+   ============================================================ */
+const readBtn = document.getElementById('readBtn');
+const readPop = document.getElementById('readPop');
+
+function closeReadPop() { readPop.hidden = true; }
+
+function showReadPop(bodyHtml, stamp) {
+    readPop.innerHTML = `
+        <div class="read-pop-head">
+            <strong>Current pressure</strong>
+            <span>${stamp || ''}</span>
+            <button type="button" class="read-pop-close" id="readPopClose" aria-label="Close">&times;</button>
+        </div>${bodyHtml}`;
+    readPop.hidden = false;
+    document.getElementById('readPopClose').addEventListener('click', closeReadPop);
+}
+
+async function readPressures() {
+    const channels = [...selectedChannels].sort((a, b) => a - b);
+    if (!channels.length) {
+        showReadPop('<div class="read-msg err">Select at least one channel.</div>');
+        return;
+    }
+    readBtn.disabled = true;
+    showReadPop('<div class="read-msg info">Reading…</div>');
+    try {
+        const res = await fetch('/api/read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channels }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+            showReadPop(`<div class="read-msg err">${data.error || 'Read failed.'}</div>`);
+            return;
+        }
+        const rows = channels.map(ch => {
+            const v = data.values[String(ch)];
+            return `<div class="read-row" style="--c:${chColor(ch)};">
+                <span class="rc"><i></i>CH-${ch}</span>
+                <span class="rv">${fmt2(v)}<small>${v === null || v === undefined ? '' : unitOf(ch)}</small></span>
+            </div>`;
+        }).join('');
+        showReadPop(rows, data.read_at);
+    } catch (err) {
+        showReadPop('<div class="read-msg err">Could not reach the server.</div>');
+    } finally {
+        readBtn.disabled = false;
+    }
+}
+
+readBtn.addEventListener('click', readPressures);
+document.addEventListener('click', e => {
+    if (!readPop.hidden && !e.target.closest('.read-wrap')) closeReadPop();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReadPop(); });
+
 
 resetBtn.addEventListener('click', resetTest);
 startBtn.addEventListener('click', startTest);

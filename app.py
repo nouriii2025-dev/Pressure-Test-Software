@@ -2028,5 +2028,53 @@ def api_test_connection():
         client.close()
 
 
+@app.route('/api/read', methods=['POST'])
+def api_read():
+    """Read-only snapshot of current pressure for the requested channels.
+
+    Does not create a session, start monitoring, log, or change any state.
+    While a test is running it returns the latest values the monitor already
+    holds (so the instrument isn't opened by a second connection).
+    """
+    payload = request.get_json(silent=True) or {}
+    wanted = []
+    for c in payload.get('channels') or []:
+        try:
+            ci = int(c)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= ci <= TOTAL_CHANNELS and ci not in wanted:
+            wanted.append(ci)
+    wanted.sort()
+    if not wanted:
+        return jsonify({'ok': False, 'error': 'Select at least one channel.'}), 400
+
+    with state_lock:
+        session = state.get('session')
+        if state['running'] and session and session.get('status') == 'Running':
+            values = {}
+            for ch in wanted:
+                slot = session['channel_data'].get(ch)
+                values[str(ch)] = slot.get('current_pressure') if slot else None
+            return jsonify({'ok': True, 'source': 'running_test', 'values': values,
+                            'read_at': datetime.now().strftime('%H:%M:%S')})
+
+    cfg = get_settings()
+    if not cfg.get('ip_address'):
+        return jsonify({'ok': False, 'error': 'No instrument IP set. Enter it under Connection and click Save.'}), 400
+
+    try:
+        reading = read_abb_data()
+    except Exception as exc:
+        return jsonify({'ok': False, 'error': f'Read failed: {exc}'}), 502
+    if reading is None:
+        return jsonify({'ok': False,
+                        'error': f"Unable to connect to RVG 200 at {cfg['ip_address']}:{cfg['port']}."}), 502
+
+    values = {str(ch): reading.get(f'Ch_{ch}') for ch in wanted}
+    return jsonify({'ok': True, 'source': 'instrument', 'values': values,
+                    'read_at': datetime.now().strftime('%H:%M:%S')})
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
