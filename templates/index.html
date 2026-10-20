@@ -1149,6 +1149,7 @@ function openUnitPopup(ch, anchor) {
             ${UNIT_OPTIONS.map(u =>
                 `<option value="${u}" ${u === unitOf(ch) ? 'selected' : ''}>${u}</option>`).join('')}
         </select>
+        <label for="offsetInput_${ch}">CH-${ch} offset</label>
         <button type="button" class="small-btn" id="unitDeselectBtn">Deselect channel</button>
     `;
     document.body.appendChild(unitPopup);
@@ -1351,9 +1352,6 @@ function renderChart(data) {
             labels = hist.map(s => s.elapsed_time);
         }
     });
-
-    // Anchor every line at zero at t = 0
-    //if (labels.length) labels = ['0:00:00', ...labels];
 
     const datasets = channels.map((ch, idx) => {
         const hist = channelData[String(ch)]?.history || [];
