@@ -244,6 +244,14 @@ def write_session_log(session, row):
         writer.writerow(row)
 
 
+def _parse_offset(v):
+    """Offset entered in the channel pop-up (signed number); 0 if missing/invalid."""
+    try:
+        f = float(v)
+        return f if math.isfinite(f) else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
 def read_abb_data():
     """Read all 6 channels from the ABB RVG 200."""
     cfg = get_settings()
@@ -314,6 +322,7 @@ def create_session(config):
             input_ratings = {}
 
     channel_units = config.get('channel_units') or {}
+    channel_offsets = config.get('channel_offsets') or {}
     default_unit = config.get('unit', 'psi')
 
     channel_data = {}
@@ -331,6 +340,7 @@ def create_session(config):
                 input_ratings.get(str(ch), input_ratings.get(ch, '20K'))
             ),
             'unit': str(channel_units.get(str(ch), default_unit)),
+            'offset': _parse_offset(channel_offsets.get(str(ch), channel_offsets.get(ch, 0))), 
             'max_error': 0.0,
             'relative_error': 0.0,
         }
@@ -502,6 +512,7 @@ def update_session_from_reading(session, reading):
             continue  # skip N/A / ERR
 
         slot = session['channel_data'][ch]
+        value = round(value + slot.get('offset', 0.0), 2)
 
         if holding and slot['hold_index'] is None:   # channel had no reading at Hold click
             slot['hold_index'] = len(slot['history'])
@@ -1965,6 +1976,7 @@ def api_read():
     wanted.sort()
     if not wanted:
         return jsonify({'ok': False, 'error': 'Select at least one channel.'}), 400
+    offsets = payload.get('channel_offsets') or {}
 
     with state_lock:
         session = state.get('session')
@@ -1988,7 +2000,12 @@ def api_read():
         return jsonify({'ok': False,
                         'error': f"Unable to connect to RVG 200 at {cfg['ip_address']}:{cfg['port']}."}), 502
 
-    values = {str(ch): reading.get(f'Ch_{ch}') for ch in wanted}
+    values = {}
+    for ch in wanted:
+        v = reading.get(f'Ch_{ch}')
+        if isinstance(v, (int, float)):
+            v = round(v + _parse_offset(offsets.get(str(ch), 0)), 2)   # apply channel offset
+        values[str(ch)] = v
     return jsonify({'ok': True, 'source': 'instrument', 'values': values,
                     'read_at': datetime.now().strftime('%H:%M:%S')})
 

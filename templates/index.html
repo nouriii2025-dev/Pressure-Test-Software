@@ -1082,6 +1082,10 @@ let isRunning = false;
 const UNIT_OPTIONS = ['psi', 'bar', 'kPa', 'MPa'];
 const channelUnits = {};                       // { 1: 'psi', 2: 'bar', ... }
 const unitOf = ch => channelUnits[ch] || 'psi';
+
+const channelOffsets = {};                     // { 1: 10, 2: -5, ... }
+const offsetOf = ch => Number(channelOffsets[ch]) || 0;     
+
 let unitPopup = null;
 
 
@@ -1150,6 +1154,7 @@ function openUnitPopup(ch, anchor) {
                 `<option value="${u}" ${u === unitOf(ch) ? 'selected' : ''}>${u}</option>`).join('')}
         </select>
         <label for="offsetInput_${ch}">CH-${ch} offset</label>
+        <input type="number" id="offsetInput_${ch}" step="any" value="${offsetOf(ch)}"> 
         <button type="button" class="small-btn" id="unitDeselectBtn">Deselect channel</button>
     `;
     document.body.appendChild(unitPopup);
@@ -1162,6 +1167,10 @@ function openUnitPopup(ch, anchor) {
         channelUnits[ch] = e.target.value;
         closeUnitPopup();
         renderChannelGrid();                          // unit now shows under the label
+    });
+    unitPopup.querySelector(`#offsetInput_${ch}`).addEventListener('input', e => {
+        const v = parseFloat(e.target.value);
+        channelOffsets[ch] = Number.isFinite(v) ? v : 0;
     });
     unitPopup.querySelector('#unitDeselectBtn').addEventListener('click', () => {
         selectedChannels.delete(ch);
@@ -1558,6 +1567,7 @@ async function startTest() {
 
         unit: unitOf(channels[0]),    // session-level fallback
         channel_units: Object.fromEntries(channels.map(ch => [String(ch), unitOf(ch)])),
+        channel_offsets: Object.fromEntries(channels.map(ch => [String(ch), offsetOf(ch)])),
         test_medium: document.getElementById('testMedium').value,
         test_duration_minutes: Number(document.getElementById('testDuration').value || 0),
         sample_interval: Number(document.getElementById('sampleInterval').value || 1),
@@ -1855,7 +1865,10 @@ async function readPressures() {
         const res = await fetch('/api/read', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ channels }),
+            body: JSON.stringify({
+                channels,
+                channel_offsets: Object.fromEntries(channels.map(ch => [String(ch), offsetOf(ch)])),
+            }),
         });
         const data = await res.json();
         if (!res.ok || !data.ok) {
