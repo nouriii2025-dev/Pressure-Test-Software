@@ -425,7 +425,6 @@ def payload_for_session(session):
 
     # Flat history for frontend (with Channel column)
     flat_history = []
-    samples = {}
     for ch in session['channels']:
         for sample in session['channel_data'][ch]['history']:
             row = dict(sample)
