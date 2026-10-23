@@ -784,6 +784,9 @@
         </div>
     </div>
     <div class="topbar-right">
+    <button class="read-btn" id="newWindowBtn" type="button" title="Open another independent dashboard window">
+        New Window
+    </button>
     <div class="read-wrap">
         <button class="read-btn" id="readBtn" type="button" title="Read the current pressure of the selected channels (does not start a test)">Read</button>
     <div class="read-pop" id="readPop" role="status" aria-live="polite" hidden></div>
@@ -1079,6 +1082,15 @@ const timerFill    = document.getElementById('timerFill');
    ============================================================ */
 let selectedChannels = new Set([1]); // default: Ch1 selected
 let isRunning = false;
+
+let sessionId = sessionStorage.getItem('pressure_test_session_id') || null;
+
+function sessionUrl(path) {
+    return sessionId
+        ? `${path}?session_id=${encodeURIComponent(sessionId)}`
+        : path;
+}
+
 const UNIT_OPTIONS = ['psi', 'bar', 'kPa', 'MPa'];
 const channelUnits = {};                       // { 1: 'psi', 2: 'bar', ... }
 const unitOf = ch => channelUnits[ch] || 'psi';
@@ -1495,7 +1507,7 @@ function renderTimer(data) {
    ============================================================ */
 async function fetchState() {
     try {
-        const res = await fetch('/api/state');
+        const res = await fetch(sessionUrl('/api/state'));
         const data = await res.json();
         if (!data) return;
 
@@ -1533,14 +1545,21 @@ async function resetTest() {
     if (lastState && lastState.session_id) {
         if (!confirm('Clear all data from the current test and reset the dashboard?')) return;
     }
+
     resetBtn.disabled = true;
+
     try {
-        await fetch('/api/reset', { method: 'POST' });
-        await fetchState();          // redraw immediately instead of waiting for the next poll
+        await fetch(sessionUrl('/api/reset'), { method: 'POST' });
+
+        sessionId = null;
+        sessionStorage.removeItem('pressure_test_session_id');
+
+        await fetchState();
     } catch (err) {
         console.error('resetTest failed:', err);
         alert('Could not reset the dashboard.');
     }
+
     resetBtn.disabled = false;
 }
 
@@ -1596,6 +1615,7 @@ async function startTest() {
             body: JSON.stringify(payload),
         });
         const data = await res.json();
+
         if (data.error) {
             alert(data.error);
             startBtn.disabled = false;
@@ -1603,6 +1623,10 @@ async function startTest() {
             stopBtn.disabled = true;
             return;
         }
+
+        sessionId = data.session_id;
+        sessionStorage.setItem('pressure_test_session_id', sessionId);
+
         await fetchState();
     } catch (err) {
         alert('Failed to start test: ' + err.message);
@@ -1614,7 +1638,7 @@ async function startTest() {
 async function holdTest() {
     holdBtn.disabled = true;
     try {
-        const res = await fetch('/api/hold', { method: 'POST' });
+        const res = await fetch(sessionUrl('/api/hold'), { method: 'POST' });
         const data = await res.json();
         if (data.error) alert(data.error);
         await fetchState();
@@ -1627,7 +1651,7 @@ async function holdTest() {
 async function stopTest() {
     stopBtn.disabled = true;
     try {
-        await fetch('/api/stop', { method: 'POST' });
+        await fetch(sessionUrl('/api/stop'), { method: 'POST' });
         await fetchState();
     } catch (err) {
         alert('Failed to stop test: ' + err.message);
@@ -1652,10 +1676,15 @@ document.getElementById('csvFileInput').addEventListener('change', async functio
     try {
         const res = await fetch('/api/import_csv', { method: 'POST', body: formData });
         const data = await res.json();
+
         if (!res.ok || data.error) {
             alert(data.error || 'Failed to import CSV.');
             return;
         }
+
+        sessionId = data.session_id;
+        sessionStorage.setItem('pressure_test_session_id', sessionId);
+
         alert(`CSV imported successfully. ${data.count} records loaded.`);
         await fetchState();
     } catch (err) {
@@ -1669,7 +1698,7 @@ async function exportCsv() {
 
     // 1. Get the file from the server (same endpoint, same content)
     try {
-        const res = await fetch('/api/export_csv');
+        const res = await fetch(sessionUrl('/api/export_csv'));
         if (!res.ok) {
             let msg = 'Failed to export CSV.';
             try { msg = (await res.json()).error || msg; } catch (_) {}
@@ -1718,7 +1747,7 @@ async function exportCsv() {
 
 async function openReport() {
     try {
-        const res = await fetch('/api/report');
+        const res = await fetch(sessionUrl('/api/report'));
         const data = await res.json();
         if (data.report_url) {
             window.open(data.report_url, '_blank');
@@ -1896,6 +1925,16 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReadPop(); });
 
+document.getElementById('newWindowBtn').addEventListener('click', () => {
+    const width = Math.min(1500, window.screen.availWidth - 40);
+    const height = Math.min(950, window.screen.availHeight - 40);
+
+    window.open(
+        window.location.href,
+        '_blank',
+        `width=${width},height=${height},noopener`
+    );
+});
 
 resetBtn.addEventListener('click', resetTest);
 startBtn.addEventListener('click', startTest);

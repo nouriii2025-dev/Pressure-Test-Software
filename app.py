@@ -49,14 +49,27 @@ def get_logo_data_uri():
 
 app.config['JSON_SORT_KEYS'] = False
 
-state_lock = threading.RLock()
+# state_lock = threading.RLock()
 
-state = {
-    'running': False,
-    'session': None,
-    'error': None,
-    'thread': None,
-}
+# state = {
+#     'running': False,
+#     'session': None,
+#     'error': None,
+#     'thread': None,
+# }
+import uuid
+
+state_lock = threading.RLock()
+modbus_lock = threading.Lock()
+
+# session_id -> session dict
+SESSIONS = {}
+
+# session_id -> monitoring Thread
+MONITOR_THREADS = {}
+
+# session_id -> last error
+SESSION_ERRORS = {}
 
 # ---------------------------------------------------------------------------
 # Instrument connection settings (persisted in settings.json)
@@ -253,42 +266,44 @@ def _parse_offset(v):
         return 0.0
 
 def read_abb_data():
-    """Read all 6 channels from the ABB RVG 200."""
     cfg = get_settings()
     client = ModbusTcpClient(cfg['ip_address'], port=cfg['port'], timeout=3)
     readings = {}
 
-    if not client.connect():
-        return None
+    with modbus_lock:
+        if not client.connect():
+            return None
 
-    try:
-        for channel in range(1, TOTAL_CHANNELS + 1):
-            start_addr = (channel - 1) * 2
-            try:
-                response = client.read_holding_registers(
-                    address=start_addr, count=2, device_id=cfg['device_id']
-                )
-            except Exception:
-                readings[f'Ch_{channel}'] = None
-                continue
-
-            if not response.isError():
-                reg1, reg2 = response.registers
-                raw_bytes = struct.pack('>HH', reg2, reg1)
-                float_val = struct.unpack('>f', raw_bytes)[0]
-
-                if (
-                    not math.isfinite(float_val)
-                    or float_val <= -99990
-                    or float_val >= 99990
-                ):
+        try:
+            for channel in range(1, TOTAL_CHANNELS + 1):
+                start_addr = (channel - 1) * 2
+                try:
+                    response = client.read_holding_registers(
+                        address=start_addr,
+                        count=2,
+                        device_id=cfg['device_id']
+                    )
+                except Exception:
                     readings[f'Ch_{channel}'] = None
+                    continue
+
+                if not response.isError():
+                    reg1, reg2 = response.registers
+                    raw_bytes = struct.pack('>HH', reg2, reg1)
+                    float_val = struct.unpack('>f', raw_bytes)[0]
+
+                    if (
+                        not math.isfinite(float_val)
+                        or float_val <= -99990
+                        or float_val >= 99990
+                    ):
+                        readings[f'Ch_{channel}'] = None
+                    else:
+                        readings[f'Ch_{channel}'] = round(float_val, 2)
                 else:
-                    readings[f'Ch_{channel}'] = round(float_val, 2)
-            else:
-                readings[f'Ch_{channel}'] = None
-    finally:
-        client.close()
+                    readings[f'Ch_{channel}'] = None
+        finally:
+            client.close()
 
     return readings
 
@@ -297,7 +312,7 @@ def read_abb_data():
 # ---------------------------------------------------------------------------
 def create_session(config):
     now = datetime.now()
-    session_id = now.strftime('%Y%m%d_%H%M%S')
+    session_id = now.strftime('%Y%m%d_%H%M%S') + '_' + uuid.uuid4().hex[:6]
 
     # Selected channels (default: all)
     raw_channels = config.get('channels') or list(range(1, TOTAL_CHANNELS + 1))
@@ -397,8 +412,17 @@ def create_session(config):
 
     return session
 
+def get_busy_channels():
+    busy = set()
 
-def payload_for_session(session):
+    with state_lock:
+        for session in SESSIONS.values():
+            if session.get('status') == 'Running':
+                busy.update(session.get('channels', []))
+
+    return busy
+
+def payload_for_session(session, session_id=None):
     if not session:
         return {
             'running': False,
@@ -413,7 +437,7 @@ def payload_for_session(session):
             'start_pressure': None,
             'end_pressure': None,
             'result': 'Pending',
-            'last_error': state.get('error'),
+            'last_error': SESSION_ERRORS.get(session_id),
             'session_data': {},
         }
 
@@ -444,7 +468,7 @@ def payload_for_session(session):
     flat_history.sort(key=lambda r: r.get('timestamp', ''))
 
     return {
-        'running': state['running'],
+        'running': session['status'] == 'Running',
         'status': session['status'],
         'phase': 'Holding' if holding else session['status'],
         'hold_at': session.get('hold_at'),
@@ -472,7 +496,7 @@ def payload_for_session(session):
         'start_pressure': session['start_pressure'],
         'end_pressure': session['end_pressure'],
         'result': session['result'],
-        'last_error': state.get('error'),
+        'last_error': SESSION_ERRORS.get(session['session_id']),
         'session_data': {
             'unit': session['unit'],
             'test_medium': session['test_medium'],
@@ -555,12 +579,9 @@ def update_session_from_reading(session, reading):
     append_archive_csv(reading)
 
 
-
-def stop_session(reason='Manual Stop'):
-    global state
-
+def stop_session(session_id, reason='Manual Stop'):
     with state_lock:
-        session = state['session']
+        session = SESSIONS.get(session_id)
 
         if session is None:
             return None
@@ -583,16 +604,17 @@ def stop_session(reason='Manual Stop'):
 
         session['status'] = 'Completed'
 
-        # ---------------------------------------------------------
-        # Finalize each channel
-        # ---------------------------------------------------------
+        # -------------------------------------------------------
+        # Keep your existing per-channel result calculation here
+        # -------------------------------------------------------
         overall_result = 'PASS'
         has_valid_test = False
         held = bool(session.get('hold_at'))
 
         for ch in session['channels']:
             slot = session['channel_data'][ch]
-            if not held:                       # Stop pressed without Hold: nothing to evaluate
+
+            if not held:
                 slot['start_pressure'] = None
                 slot['end_pressure'] = None
                 slot['pressure_drop'] = None
@@ -602,11 +624,8 @@ def stop_session(reason='Manual Stop'):
                 overall_result = 'NO HOLD'
                 continue
 
-            hist = test_history(session, ch)   # Hold -> Stop only
+            hist = test_history(session, ch)
 
-            # -----------------------------------------------------
-            # No valid RVG200 pressure data received
-            # -----------------------------------------------------
             if not hist or slot['start_pressure'] is None:
                 slot['current_pressure'] = None
                 slot['end_pressure'] = None
@@ -614,13 +633,9 @@ def stop_session(reason='Manual Stop'):
                 slot['max_error'] = 0.0
                 slot['relative_error'] = 0.0
                 slot['result'] = 'NO DATA'
-
                 overall_result = 'NO DATA'
                 continue
 
-            # -----------------------------------------------------
-            # Only one valid pressure reading
-            # -----------------------------------------------------
             if len(hist) < 2:
                 slot['current_pressure'] = hist[-1]['pressure']
                 slot['end_pressure'] = hist[-1]['pressure']
@@ -632,29 +647,18 @@ def stop_session(reason='Manual Stop'):
                 if overall_result == 'PASS':
                     overall_result = 'INSUFFICIENT DATA'
 
-                # Update history
                 hist[-1]['status'] = 'Completed'
                 hist[-1]['result'] = slot['result']
-
                 continue
 
-            # -----------------------------------------------------
-            # Valid test data exists
-            # -----------------------------------------------------
             has_valid_test = True
-
             slot['current_pressure'] = hist[-1]['pressure']
             slot['end_pressure'] = hist[-1]['pressure']
 
             start = slot['start_pressure']
             end = slot['end_pressure']
-
-            # Calculate pressure drop
             slot['pressure_drop'] = round(start - end, 2)
 
-            # -----------------------------------------------------
-            # Calculate maximum error
-            # -----------------------------------------------------
             valid_pressures = [
                 sample['pressure']
                 for sample in hist
@@ -662,25 +666,17 @@ def stop_session(reason='Manual Stop'):
                 and math.isfinite(sample['pressure'])
             ]
 
-            if valid_pressures:
-                max_err = max(
-                    abs(start - pressure)
-                    for pressure in valid_pressures
-                )
-            else:
-                max_err = 0.0
+            max_err = max(
+                (abs(start - pressure) for pressure in valid_pressures),
+                default=0.0
+            )
 
             slot['max_error'] = round(max_err, 2)
-
             slot['relative_error'] = round(
                 (max_err / start * 100) if start != 0 else 0.0,
                 2
             )
 
-            # -----------------------------------------------------
-            # PASS / FAIL
-            # Only valid pressure data can produce PASS/FAIL
-            # -----------------------------------------------------
             if slot['pressure_drop'] <= session['max_allowable_pressure_drop']:
                 slot['result'] = 'PASS'
             else:
@@ -689,30 +685,18 @@ def stop_session(reason='Manual Stop'):
             if slot['result'] == 'FAIL':
                 overall_result = 'FAIL'
 
-            # Update last history row
             hist[-1]['status'] = 'Completed'
             hist[-1]['result'] = slot['result']
 
-        # ---------------------------------------------------------
-        # Never allow PASS when there is no valid test data
-        # ---------------------------------------------------------
-        if not has_valid_test:
-            if overall_result == 'PASS':
-                overall_result = 'NO DATA'
+        if not has_valid_test and overall_result == 'PASS':
+            overall_result = 'NO DATA'
 
-        # ---------------------------------------------------------
-        # Update session result
-        # ---------------------------------------------------------
         session['result'] = overall_result
         session['reason'] = reason
-
-        state['running'] = False
-        state['error'] = None
+        SESSION_ERRORS[session_id] = None
 
     print(
-        f"[TEST STOPPED] "
-        f"Session={session['session_id']} "
-        f"Reason={reason}"
+        f"[TEST STOPPED] Session={session_id} Reason={reason}"
     )
 
     try:
@@ -726,6 +710,27 @@ def stop_session(reason='Manual Stop'):
 def generate_report_file(session):
     if not session:
         return None
+
+        # Actual test duration: Hold to Stop
+    duration_text = "00:00:00"
+
+    duration_origin = (
+        session.get('hold_at')
+        if session.get('uses_hold')
+        else session.get('started_at')
+    )
+
+    if duration_origin and session.get('ended_at'):
+        try:
+            duration_seconds = (
+                datetime.fromisoformat(session['ended_at'])
+                - datetime.fromisoformat(duration_origin)
+            ).total_seconds()
+
+            duration_text = format_elapsed(duration_seconds)
+
+        except (ValueError, TypeError):
+            pass
 
     unit = session.get('unit', 'psi')
     channels = session.get('channels', [])
@@ -768,7 +773,7 @@ def generate_report_file(session):
                 <tr><td class="k">Input</td><td class="v">{_esc(slot['input_full_scale'])}</td></tr>
                 <tr><td class="k">Start</td><td class="v">{_esc(started_at_str)} ({_esc(started_offset)})</td></tr>
                 <tr><td class="k">End</td><td class="v">{_esc(ended_at_str)} ({_esc(ended_offset)})</td></tr>
-                <tr><td class="k">Test duration</td><td class="v">{format_elapsed(session['test_duration'])}</td></tr>
+                <tr><td class="k">Test duration</td><td class="v">{_esc(duration_text)}</td></tr>
                 <tr><td class="k">Start value</td><td class="v">{_fmt(slot['start_pressure'])} {_esc(unit)}</td></tr>
                 <tr><td class="k">End value</td><td class="v">{_fmt(slot['end_pressure'])} {_esc(unit)}</td></tr>
                 <tr><td class="k">Max. error</td><td class="v">{_fmt(slot['max_error'])} {_esc(unit)}</td></tr>
@@ -889,18 +894,7 @@ def generate_report_file(session):
     table_html = "\n".join(table_rows) if table_rows else \
         '<tr><td colspan="7" style="text-align:center;color:#6b7280;padding:16px;">No data.</td></tr>'
 
-    duration_text = "00:00:00"
-    duration_origin = (
-        session.get('hold_at') if session.get('uses_hold') else session.get('started_at')
-    )
-    if duration_origin and session.get('ended_at'):
-        try:
-            duration_text = format_elapsed(
-                (datetime.fromisoformat(session['ended_at'])
-                 - datetime.fromisoformat(duration_origin)).total_seconds()
-            )
-        except Exception:
-            pass
+    
 
     overall_class = 'pass' if session.get('result') == 'PASS' else 'fail'
 
@@ -1448,39 +1442,40 @@ document.getElementById('saveReportBtn').addEventListener('click', async functio
 # ---------------------------------------------------------------------------
 # Monitoring thread
 # ---------------------------------------------------------------------------
-def monitoring_loop():
+def monitoring_loop(session_id):
     while True:
         with state_lock:
-            if not state['running']:
-                break
-            session = state['session']
+            session = SESSIONS.get(session_id)
+
             if not session or session['status'] != 'Running':
                 break
-            sample_interval = max(0.1, float(session.get('sample_interval', 1.0)))
+
+            sample_interval = max(
+                0.1,
+                float(session.get('sample_interval', 1.0))
+            )
 
         try:
             reading = read_abb_data()
 
             with state_lock:
-                if not state['running']:
-                    break
-                session = state['session']
+                session = SESSIONS.get(session_id)
+
                 if not session or session['status'] != 'Running':
                     break
 
                 if reading is None:
-                    state['error'] = f"Unable to read data from RVG 200 at {get_settings()['ip_address']}."
+                    SESSION_ERRORS[session_id] = (
+                        f"Unable to read data from RVG 200 at "
+                        f"{get_settings()['ip_address']}."
+                    )
                 else:
                     update_session_from_reading(session, reading)
-                    state['error'] = None
+                    SESSION_ERRORS[session_id] = None
 
         except Exception as exc:
             with state_lock:
-                state['error'] = str(exc)
-
-        with state_lock:
-            if not state['running']:
-                break
+                SESSION_ERRORS[session_id] = str(exc)
 
         time.sleep(sample_interval)
 
@@ -1495,33 +1490,59 @@ def index():
 
 def automatic_stop_session(session_id):
     with state_lock:
-        session = state.get('session')
-        if not session or session.get('session_id') != session_id:
-            return
-        if not state.get('running') or session.get('status') != 'Running':
+        session = SESSIONS.get(session_id)
+
+        if not session or session.get('status') != 'Running':
             return
 
     print(f"[TIMER] Test duration reached for session {session_id}")
-    stop_session('Timer-Based Automatic Stop')
+    stop_session(session_id, 'Timer-Based Automatic Stop')
 
 
 @app.route('/api/start', methods=['POST'])
 def api_start():
     payload = request.get_json(silent=True) or {}
+
     if not payload:
         return jsonify({'error': 'No configuration received.'}), 400
 
+    # -----------------------------------------------------------
+    # NEW: prevent two windows from using the same RVG channel
+    # -----------------------------------------------------------
+    requested_channels = set()
+
+    for c in payload.get('channels') or []:
+        try:
+            ci = int(c)
+            if 1 <= ci <= TOTAL_CHANNELS:
+                requested_channels.add(ci)
+        except (TypeError, ValueError):
+            continue
+
+    busy = get_busy_channels()
+    overlap = sorted(requested_channels & busy)
+
+    if overlap:
+        return jsonify({
+            'error': (
+                'Channel(s) '
+                + ', '.join(f'CH-{c}' for c in overlap)
+                + ' are already used by another running test.'
+            )
+        }), 400
+
     with state_lock:
-        if state['running']:
-            return jsonify({'error': 'A test is already running.'}), 400
-
         session = create_session(payload)
-        state['session'] = session
-        state['running'] = True
-        state['error'] = None
+        SESSIONS[session['session_id']] = session
+        SESSION_ERRORS[session['session_id']] = None
 
-        state['thread'] = threading.Thread(target=monitoring_loop, daemon=True)
-        state['thread'].start()
+        thread = threading.Thread(
+            target=monitoring_loop,
+            args=(session['session_id'],),
+            daemon=True
+        )
+        MONITOR_THREADS[session['session_id']] = thread
+        thread.start()
 
     return jsonify({
         'status': 'started',
@@ -1532,10 +1553,14 @@ def api_start():
 
 @app.route('/api/hold', methods=['POST'])
 def api_hold():
+    session_id = request.args.get('session_id')
+
     with state_lock:
-        session = state['session']
-        if not session or not state['running'] or session['status'] != 'Running':
+        session = SESSIONS.get(session_id)
+
+        if not session or session['status'] != 'Running':
             return jsonify({'error': 'No running test to hold.'}), 400
+
         if session.get('hold_at'):
             return jsonify({'error': 'Hold has already been applied.'}), 400
 
@@ -1544,6 +1569,7 @@ def api_hold():
         for ch in session['channels']:
             slot = session['channel_data'][ch]
             hist = slot['history']
+
             if hist:
                 slot['hold_index'] = len(hist) - 1
                 slot['start_pressure'] = hist[-1]['pressure']
@@ -1558,91 +1584,113 @@ def api_hold():
         session['pressure_drop'] = first['pressure_drop']
 
         test_duration = session.get('test_duration', 0)
-        if test_duration > 0:                      # auto-stop now counts from Hold
-            timer = threading.Timer(test_duration, automatic_stop_session,
-                                    args=(session['session_id'],))
+
+        if test_duration > 0:
+            timer = threading.Timer(
+                test_duration,
+                automatic_stop_session,
+                args=(session_id,)
+            )
             timer.daemon = True
             session['timer'] = timer
             timer.start()
 
-        hold_at = session['hold_at']
-    return jsonify({'status': 'holding', 'hold_at': hold_at})
+    return jsonify({
+        'status': 'holding',
+        'hold_at': session['hold_at']
+    })
 
 
 @app.route('/api/stop', methods=['POST'])
 def api_stop():
-    with state_lock:
-        if not state['session']:
-            return jsonify({'status': 'idle'})
+    session_id = request.args.get('session_id')
+    session = stop_session(session_id, 'Manual Stop')
 
-    session = stop_session('Manual Stop')
+    if not session:
+        return jsonify({'error': 'Session not found.'}), 404
+
     return jsonify({
         'status': 'stopped',
-        'session_id': session['session_id'] if session else None,
+        'session_id': session_id
     })
+
 
 
 @app.route('/api/reset', methods=['POST'])
 def api_reset():
+    session_id = request.args.get('session_id')
+
     with state_lock:
-        session = state['session']
-        thread = state.get('thread')
+        session = SESSIONS.get(session_id)
 
-        if session is not None:
-            timer = session.get('timer')
-            if timer is not None:
-                try:
-                    timer.cancel()
-                except Exception:
-                    pass
-                session['timer'] = None
+        if not session:
+            return jsonify({'status': 'reset'})
 
-        state['running'] = False      # monitoring_loop exits on its next check
-        state['session'] = None       # drops samples, hold time, results
-        state['error'] = None
-        state['thread'] = None
+        timer = session.get('timer')
+
+        if timer is not None:
+            try:
+                timer.cancel()
+            except Exception:
+                pass
+
+        session['timer'] = None
+        session['status'] = 'Idle'
+        SESSIONS.pop(session_id, None)
+        SESSION_ERRORS.pop(session_id, None)
+        thread = MONITOR_THREADS.pop(session_id, None)
 
     if thread is not None and thread.is_alive():
-        thread.join(timeout=2)        # outside the lock so the loop can finish
+        thread.join(timeout=2)
 
     return jsonify({'status': 'reset'})
 
 
 @app.route('/api/state')
 def api_state():
+    session_id = request.args.get('session_id')
+
     with state_lock:
-        session = state['session']
-        payload = payload_for_session(session)
+        session = SESSIONS.get(session_id)
+        payload = payload_for_session(session, session_id)
+
     return jsonify(payload)
+
 
 @app.route('/api/export_csv')
 def api_export_csv():
+    session_id = request.args.get('session_id')
+
     with state_lock:
-        session = state['session']
+        session = SESSIONS.get(session_id)
 
     if not session:
         return jsonify({'error': 'No test data available.'}), 400
 
     channels = session['channels']
 
-    # Group samples taken at the same moment into one row
-    # (n handles two readings landing in the same second)
     groups = {}
+
     for ch in channels:
         seen = {}
+
         for s in session['channel_data'][ch]['history']:
             key = (s['timestamp'], s['elapsed_time'])
             n = seen.get(key, 0)
             seen[key] = n + 1
-            groups.setdefault((s['timestamp'], n, s['elapsed_time']), {})[ch] = s
+            groups.setdefault(
+                (s['timestamp'], n, s['elapsed_time']), {}
+            )[ch] = s
 
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=log_fieldnames(channels))
     writer.writeheader()
+
     for key in sorted(groups, key=lambda k: (k[0], k[1])):
         writer.writerow(build_log_row(channels, groups[key]))
 
     output.seek(0)
+
     return send_file(
         io.BytesIO(output.getvalue().encode('utf-8-sig')),
         mimetype='text/csv',
@@ -1832,9 +1880,8 @@ def api_import_csv():
         }
 
         with state_lock:
-            state['session'] = imported_session
-            state['running'] = False
-            state['error'] = None
+            SESSIONS[imported_session['session_id']] = imported_session
+            SESSION_ERRORS[imported_session['session_id']] = None
 
         # Try to generate the report immediately
         try:
@@ -1856,22 +1903,30 @@ def api_import_csv():
 
 @app.route('/api/report')
 def api_report():
+    session_id = request.args.get('session_id')
+
     with state_lock:
-        session = state['session']
+        session = SESSIONS.get(session_id)
 
     if not session:
         return jsonify({'error': 'No test session found.'}), 400
 
     if not session.get('ended_at'):
         return jsonify({
-            'error': 'The test is still running. Stop or complete the test before opening the report.'
+            'error': (
+                'The test is still running. Stop or complete the test '
+                'before opening the report.'
+            )
         }), 400
 
     try:
         report_path = generate_report_file(session)
-        # return jsonify({'report_url': f'/report/{os.path.basename(report_path)}'})
+
         return jsonify({
-            'report_url': f'/report/{os.path.basename(report_path)}?t={int(time.time())}'
+            'report_url': (
+                f'/report/{os.path.basename(report_path)}'
+                f'?t={int(time.time())}'
+            )
         })
     except Exception as exc:
         return jsonify({'error': f'Failed to generate report: {exc}'}), 500
@@ -1899,8 +1954,15 @@ def api_get_settings():
 @app.route('/api/settings', methods=['POST'])
 def api_save_settings():
     with state_lock:
-        if state['running']:
-            return jsonify({'error': 'Stop the running test before changing connection settings.'}), 400
+        any_running = any(
+            session.get('status') == 'Running'
+            for session in SESSIONS.values()
+        )
+
+    if any_running:
+        return jsonify({
+            'error': 'Stop all running tests before changing connection settings.'
+        }), 400
 
     clean, err = validate_settings(request.get_json(silent=True))
     if err:
@@ -1921,8 +1983,16 @@ def api_save_settings():
 def api_test_connection():
     """Try the values currently typed in the UI (saved or not)."""
     with state_lock:
-        if state['running']:
-            return jsonify({'ok': False, 'error': 'Cannot test while a test is running.'}), 400
+        any_running = any(
+            session.get('status') == 'Running'
+            for session in SESSIONS.values()
+        )
+
+    if any_running:
+        return jsonify({
+            'ok': False,
+            'error': 'Cannot test while a test is running.'
+        }), 400
 
     payload = request.get_json(silent=True)
     clean, err = validate_settings(payload) if payload else (get_settings(), None)
@@ -1966,15 +2036,32 @@ def api_read():
     offsets = payload.get('channel_offsets') or {}
 
     with state_lock:
-        session = state.get('session')
-        if state['running'] and session and session.get('status') == 'Running':
-            values = {}
-            for ch in wanted:
-                slot = session['channel_data'].get(ch)
-                values[str(ch)] = slot.get('current_pressure') if slot else None
-            return jsonify({'ok': True, 'source': 'running_test', 'values': values,
-                            'read_at': datetime.now().strftime('%H:%M:%S')})
+        running_sessions = [
+            session for session in SESSIONS.values()
+            if session.get('status') == 'Running'
+        ]
 
+        if running_sessions:
+            values = {}
+
+            for ch in wanted:
+                value = None
+
+                for session in running_sessions:
+                    slot = session['channel_data'].get(ch)
+
+                    if slot and slot.get('current_pressure') is not None:
+                        value = slot.get('current_pressure')
+                        break
+
+                values[str(ch)] = value
+
+            return jsonify({
+                'ok': True,
+                'source': 'running_test',
+                'values': values,
+                'read_at': datetime.now().strftime('%H:%M:%S')
+            })
     cfg = get_settings()
     if not cfg.get('ip_address'):
         return jsonify({'ok': False, 'error': 'No instrument IP set. Enter it under Connection and click Save.'}), 400
