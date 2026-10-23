@@ -1,0 +1,24 @@
+Timestamp,Elapsed Time,CH-1 Pressure,CH-2 Pressure,CH-3 Pressure,CH-1 Unit,CH-2 Unit,CH-3 Unit,Test Status,CH-1 Pressure Drop,CH-2 Pressure Drop,CH-3 Pressure Drop,Max Allowable Pressure Drop,CH-1 Result,CH-2 Result,CH-3 Result,Medium
+2026-10-23 10:00:01,0:00:03,2388.47,21.83,21.42,psi,psi,psi,Running,,,,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:05,0:00:07,2388.47,21.83,21.4,psi,psi,psi,Running,,,,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:09,0:00:11,2388.46,21.83,21.38,psi,psi,psi,Running,,,,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:13,0:00:15,2388.5,21.82,21.36,psi,psi,psi,Running,,,,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:17,0:00:19,2388.68,21.82,21.33,psi,psi,psi,Running,,,,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:20,0:00:22,2388.75,21.82,21.31,psi,psi,psi,Running,,,,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:24,0:00:26,2388.64,21.8,21.28,psi,psi,psi,Running,,,,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:28,0:00:30,2388.61,21.8,21.26,psi,psi,psi,Running,,,,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:31,0:00:33,2388.31,21.79,21.26,psi,psi,psi,Running,,,,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:35,0:00:37,2388.49,21.8,21.23,psi,psi,psi,Running,,,,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:39,0:00:41,2388.51,21.79,21.21,psi,psi,psi,Running,,,,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:43,0:00:45,2388.47,21.77,21.2,psi,psi,psi,Running,,,,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:47,0:00:49,2388.61,21.77,21.18,psi,psi,psi,Holding,-0.14,0.0,0.02,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:51,0:00:53,2388.62,21.78,21.17,psi,psi,psi,Holding,-0.15,-0.01,0.03,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:55,0:00:57,2388.62,21.77,21.16,psi,psi,psi,Holding,-0.15,0.0,0.04,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:00:58,0:01:00,2388.77,21.77,21.13,psi,psi,psi,Holding,-0.3,0.0,0.07,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:01:02,0:01:04,2388.67,21.76,21.12,psi,psi,psi,Holding,-0.2,0.01,0.08,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:01:06,0:01:08,2388.77,21.75,21.09,psi,psi,psi,Holding,-0.3,0.02,0.11,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:01:10,0:01:12,2388.81,21.73,21.08,psi,psi,psi,Holding,-0.34,0.04,0.12,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:01:13,0:01:15,2388.79,21.74,21.05,psi,psi,psi,Holding,-0.32,0.03,0.15,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:01:17,0:01:19,2388.48,21.73,21.02,psi,psi,psi,Holding,-0.01,0.04,0.18,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:01:21,0:01:23,2388.57,21.71,21.01,psi,psi,psi,Holding,-0.1,0.06,0.19,2.5,Pending,Pending,Pending,Air
+2026-10-23 10:01:25,0:01:27,2388.66,21.71,21.0,psi,psi,psi,Holding,-0.19,0.06,0.2,2.5,Pending,Pending,Pending,Air

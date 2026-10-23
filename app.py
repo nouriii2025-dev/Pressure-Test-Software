@@ -541,19 +541,6 @@ def update_session_from_reading(session, reading):
         slot['history'].append(sample)
         samples[ch] = sample    
 
-        write_session_log(session, {
-            'Timestamp': sample['timestamp'],
-            'Elapsed Time': sample['elapsed_time'],
-            'Channel': ch,
-            'Pressure': sample['pressure'],
-            'Unit': sample['unit'],
-            'Test Status': sample['status'],
-            'Pressure Drop': sample['pressure_drop'],
-            'Max Allowable Pressure Drop': sample['max_allowable_pressure_drop'],
-            'Result': sample['result'],
-            'Medium': sample['medium'],
-        })
-
     if samples:                        # <-- one row per reading, after the loop
         write_session_log(session, build_log_row(session['channels'], samples))
 
