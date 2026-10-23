@@ -1699,7 +1699,6 @@ def api_export_csv():
     )
 
 
-
 @app.route('/api/import_csv', methods=['POST'])
 def api_import_csv():
     """Import a combined CSV (with Channel column) and rebuild a session."""
@@ -1746,6 +1745,29 @@ def api_import_csv():
         max_drop = 0.0
         first_ts = None
         last_ts = None
+        hold_ts = None
+
+        for row in rows:
+            status = str(row.get('Test Status', '') or '').strip().lower()
+
+            if status in ('holding', 'hold'):
+                ts = str(row.get('Timestamp', '') or '').strip()
+                if ts:
+                    hold_ts = ts
+                    break
+
+        # Recalculate elapsed time from Hold for imported data.
+        # If Hold is unavailable, retain Start-to-Stop timing.
+        for slot in per_channel.values():
+            for sample in slot['history']:
+                sample_dt = parse_ts(sample.get('timestamp', ''))
+
+                elapsed_seconds = max(
+                    0,
+                    (sample_dt - duration_origin).total_seconds()
+                )
+
+                sample['elapsed_time'] = format_elapsed(elapsed_seconds)
 
         for row in rows:
             try:
@@ -1811,13 +1833,46 @@ def api_import_csv():
                 'medium': medium,
             })
 
-        if not per_channel:
-            return jsonify({
-                'error': 'No valid pressure data was found in the CSV file.'
-            }), 400
+        
+            if not per_channel:
+                return jsonify({
+                    'error': 'No valid pressure data was found in the CSV file.'
+                }), 400
 
-        # Compute per-channel errors and results
-        overall_result = 'PASS'
+            # Fix start/end pressure values for imported CSV reports.
+            # Start pressure = pressure at Hold, if available; otherwise first reading.
+            # End pressure = last valid pressure reading.
+            for ch, slot in per_channel.items():
+                hist = slot.get('history', [])
+
+                if not hist:
+                    slot['start_pressure'] = None
+                    slot['end_pressure'] = None
+                    slot['hold_index'] = None
+                    continue
+
+                # Find the first Hold/Holding sample for this channel.
+                hold_index = next(
+                    (
+                        i for i, sample in enumerate(hist)
+                        if str(sample.get('status', '')).strip().lower()
+                        in ('hold', 'holding')
+                    ),
+                    None
+                )
+
+                # If there is no Hold marker, use the first reading.
+                if hold_index is None:
+                    hold_index = 0
+
+                slot['hold_index'] = hold_index
+                slot['start_pressure'] = hist[hold_index]['pressure']
+                slot['end_pressure'] = hist[-1]['pressure']
+                slot['current_pressure'] = hist[-1]['pressure']
+
+            # Compute per-channel errors and results
+            overall_result = 'PASS'
+
         for ch, slot in per_channel.items():
             start = slot['start_pressure'] or 0
             hist = slot['history']
@@ -1841,6 +1896,15 @@ def api_import_csv():
 
         start_dt = parse_ts(first_ts)
         end_dt = parse_ts(last_ts)
+        hold_dt = parse_ts(hold_ts) if hold_ts else None
+
+        # Actual test duration: Hold to Stop.
+        # If the CSV has no Hold marker, fall back to Start to Stop.
+        duration_origin = hold_dt or start_dt
+        actual_duration = max(
+            0,
+            (end_dt - duration_origin).total_seconds()
+        )
 
         session_id = f"IMPORTED_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         channels = sorted(per_channel.keys())
@@ -1850,12 +1914,17 @@ def api_import_csv():
             'started_at': start_dt.isoformat(timespec='seconds'),
             'ended_at': end_dt.isoformat(timespec='seconds'),
             'status': 'Imported',
+            'uses_hold': True,
+            'hold_at': (
+                hold_dt.isoformat(timespec='seconds')
+                if hold_dt else None
+            ),
             'channels': channels,
             'channel_data': per_channel,
 
             'unit': unit,
             'test_medium': medium,
-            'test_duration': max(0, (end_dt - start_dt).total_seconds()),
+            'test_duration': actual_duration,
             'sample_interval': 1,
             'max_allowable_pressure_drop': max_drop,
 

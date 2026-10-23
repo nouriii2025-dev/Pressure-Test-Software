@@ -1,0 +1,7 @@
+Timestamp,Elapsed Time,CH-5 Pressure,CH-6 Pressure,CH-5 Unit,CH-6 Unit,Test Status,CH-5 Pressure Drop,CH-6 Pressure Drop,Max Allowable Pressure Drop,CH-5 Result,CH-6 Result,Medium
+2026-10-23 15:36:42,0:00:03,23.72,24.18,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-23 15:36:46,0:00:07,23.73,24.18,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-23 15:36:50,0:00:11,23.73,24.2,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-23 15:36:54,0:00:15,23.73,24.2,psi,psi,Holding,0.0,0.0,2.5,Pending,Pending,Air
+2026-10-23 15:36:57,0:00:18,23.74,24.21,psi,psi,Holding,-0.01,-0.01,2.5,Pending,Pending,Air
+2026-10-23 15:37:01,0:00:22,23.75,24.21,psi,psi,Holding,-0.02,-0.01,2.5,Pending,Pending,Air
