@@ -766,6 +766,113 @@
         @media (prefers-reduced-motion: reduce) {
             * { animation: none !important; transition: none !important; }
         }
+
+        /* ============================================================
+        INTERNAL DASHBOARD TABS
+        ============================================================ */
+        body.tab-host {
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Tab host: hide its own top bar, each tab has its own */
+        .tab-host > .topbar {
+            display: none !important;
+        }
+
+        .tab-host .layout {
+            display: none !important;
+        }
+
+        .workspace-tabs {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            height: 48px;
+            padding: 6px 16px 0;
+            overflow-x: auto;
+            background: #e2e8f0;
+            border-bottom: 1px solid #cbd5e1;
+        }
+
+        .workspace-tabs[hidden],
+        .workspace-panels[hidden] {
+            display: none !important;
+        }
+
+        .workspace-tab {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            min-height: 36px;
+            padding: 0 6px 0 4px;
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+        }
+
+        .workspace-tab.active {
+            background: #ffffff;
+            color: #08407a;
+            border-color: #94a3b8;
+        }
+
+        .workspace-tab-label {
+            min-height: 34px;
+            padding: 0 10px 0 14px;
+            background: transparent;
+            border: 0;
+            color: inherit;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .workspace-tab-close {
+            width: 22px;
+            min-height: 22px;
+            height: 22px;
+            padding: 0;
+            display: grid;
+            place-items: center;
+            background: transparent;
+            border: 0;
+            border-radius: 6px;
+            color: #64748b;
+            font-size: 1.1rem;
+            line-height: 1;
+        }
+
+        .workspace-tab-close:hover {
+            background: #fbe4e4;
+            color: var(--bad);
+        }
+
+        /* Only one tab left: nothing to close */
+        .workspace-tabs.single .workspace-tab-close { display: none; }
+        .workspace-tabs.single .workspace-tab-label { padding-right: 14px; }
+
+        .workspace-panels {
+            height: calc(100vh - 48px);
+            width: 100%;
+            background: var(--bg);
+        }
+
+        .workspace-frame {
+            display: none;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: var(--bg);
+        }
+
+        .workspace-frame.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -805,6 +912,10 @@
     </div>
 </div>
 </header>
+
+<!-- Internal test tabs -->
+<div id="workspaceTabs" class="workspace-tabs" hidden></div>
+<div id="workspacePanels" class="workspace-panels" hidden></div>
 
 <div class="layout">
     <!-- ============================= SIDEBAR ============================= -->
@@ -1042,6 +1153,209 @@
 </div>
 
 <script>
+
+/* ============================================================
+   INTERNAL TAB MANAGER
+   ============================================================ */
+const pageParams = new URLSearchParams(window.location.search);
+const workspaceId = pageParams.get('workspace_id');
+const isTabHost = !workspaceId;
+
+if (isTabHost) {
+    // This page manages tabs. Each tab loads an isolated dashboard.
+    document.body.classList.add('tab-host');
+
+    const tabsBar = document.getElementById('workspaceTabs');
+    const panels = document.getElementById('workspacePanels');
+    const newWindowBtn = document.getElementById('newWindowBtn');
+
+    tabsBar.hidden = false;
+    panels.hidden = false;
+
+    let workspaces = [];
+    let activeWorkspaceId = null;
+
+    const sessionKeyFor = id => `pressure_test_session_id_${id}`;
+
+    function saveWorkspaceList() {
+        sessionStorage.setItem(
+            'pressure_dashboard_workspaces',
+            JSON.stringify(workspaces.map(({ id, name }) => ({ id, name })))
+        );
+    }
+
+    function updateTabsState() {
+        tabsBar.classList.toggle('single', workspaces.length <= 1);
+    }
+
+    // Next free "Test N" name (avoids duplicates after closing tabs)
+    function nextTestName() {
+        const used = workspaces.map(w => Number((w.name.match(/^Test (\d+)$/) || [])[1]) || 0);
+        return `Test ${Math.max(0, ...used) + 1}`;
+    }
+
+    function activateWorkspace(id) {
+        activeWorkspaceId = id;
+
+        tabsBar.querySelectorAll('.workspace-tab').forEach(tab => {
+            const active = tab.dataset.workspaceId === id;
+            tab.classList.toggle('active', active);
+            tab.setAttribute('aria-selected', String(active));
+        });
+
+        panels.querySelectorAll('.workspace-frame').forEach(frame => {
+            frame.classList.toggle('active', frame.dataset.workspaceId === id);
+        });
+    }
+
+    // Builds the tab + iframe for a workspace (used for new and restored tabs)
+    function addWorkspace(id, name) {
+        const tab = document.createElement('div');
+        tab.className = 'workspace-tab';
+        tab.dataset.workspaceId = id;
+        tab.setAttribute('role', 'tab');
+        tab.addEventListener('click', () => activateWorkspace(id));
+
+        const label = document.createElement('button');
+        label.type = 'button';
+        label.className = 'workspace-tab-label';
+        label.textContent = name;
+
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'workspace-tab-close';
+        close.innerHTML = '&times;';
+        close.title = `Close ${name}`;
+        close.setAttribute('aria-label', `Close ${name}`);
+        close.addEventListener('click', e => {
+            e.stopPropagation();
+            removeWorkspace(id);
+        });
+
+        tab.append(label, close);
+        tabsBar.appendChild(tab);
+
+        const frame = document.createElement('iframe');
+        frame.className = 'workspace-frame';
+        frame.dataset.workspaceId = id;
+        frame.title = name;
+
+        const url = new URL(window.location.href);
+        url.searchParams.set('workspace_id', id);
+        frame.src = url.toString();
+        panels.appendChild(frame);
+
+        workspaces.push({ id, name });
+        updateTabsState();
+    }
+
+    function createWorkspace(name = nextTestName()) {
+        const id = (
+            window.crypto && typeof window.crypto.randomUUID === 'function'
+        )
+            ? window.crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+        addWorkspace(id, name);
+        saveWorkspaceList();
+        activateWorkspace(id);
+    }
+
+    async function removeWorkspace(id) {
+        const idx = workspaces.findIndex(w => w.id === id);
+        if (idx === -1 || workspaces.length <= 1) return;
+
+        const ws = workspaces[idx];
+        const key = sessionKeyFor(id);
+        const sid = sessionStorage.getItem(key);
+
+        // Ask the backend whether this tab has a test running
+        let running = false;
+        if (sid) {
+            try {
+                const res = await fetch(`/api/state?session_id=${encodeURIComponent(sid)}`);
+                const data = await res.json();
+                running = Boolean(data && data.running);
+            } catch (err) {
+                console.error('Could not check test state:', err);
+            }
+
+            const msg = running
+                ? `"${ws.name}" has a test running. Stop the test and close this window?`
+                : `Close "${ws.name}"?`;
+            if (!confirm(msg)) return;
+
+            if (running) {
+                try {
+                    await fetch(`/api/stop?session_id=${encodeURIComponent(sid)}`, { method: 'POST' });
+                } catch (err) {
+                    console.error('Could not stop test:', err);
+                }
+            }
+        }
+
+        // Remove tab + iframe (removing the iframe also stops its polling)
+        tabsBar.querySelector(`.workspace-tab[data-workspace-id="${id}"]`)?.remove();
+        panels.querySelector(`.workspace-frame[data-workspace-id="${id}"]`)?.remove();
+
+        workspaces.splice(idx, 1);
+        sessionStorage.removeItem(key);
+        saveWorkspaceList();
+        updateTabsState();
+
+        // If the active tab was closed, switch to its neighbour
+        if (activeWorkspaceId === id) {
+            activateWorkspace(workspaces[Math.min(idx, workspaces.length - 1)].id);
+        }
+    }
+
+    newWindowBtn.title = 'Open another test in a new internal tab';
+
+    newWindowBtn.addEventListener('click', () => {
+        createWorkspace();
+    });
+
+    // A dashboard tab can request another tab through its parent.
+    window.addEventListener('message', event => {
+        if (event.origin !== window.location.origin) return;
+
+        if (event.data?.type === 'pressure-dashboard-new-tab') {
+            createWorkspace();
+        }
+    });
+
+    // Restore the tab list after refreshing the host page.
+    try {
+        const saved = JSON.parse(
+            sessionStorage.getItem('pressure_dashboard_workspaces') || '[]'
+        );
+
+        if (Array.isArray(saved) && saved.length) {
+            saved.forEach(item => {
+                if (item && item.id && item.name) {
+                    addWorkspace(item.id, item.name);
+                }
+            });
+
+            if (workspaces.length) {
+                activateWorkspace(workspaces[0].id);
+            }
+        }
+    } catch (error) {
+        console.error('Could not restore dashboard tabs:', error);
+    }
+
+    // Start with one dashboard tab if no tabs were restored.
+    if (!workspaces.length) {
+        createWorkspace('Test 1');
+    }
+
+} else {
+    /*
+     * EXISTING DASHBOARD CODE GOES HERE.
+     * Keep your existing JavaScript inside this else block.
+     */
+
 /* ============================================================
    CONFIG
    ============================================================ */
@@ -1083,7 +1397,10 @@ const timerFill    = document.getElementById('timerFill');
 let selectedChannels = new Set([1]); // default: Ch1 selected
 let isRunning = false;
 
-let sessionId = sessionStorage.getItem('pressure_test_session_id') || null;
+const SESSION_STORAGE_KEY =
+    `pressure_test_session_id_${workspaceId}`;
+
+let sessionId = sessionStorage.getItem(SESSION_STORAGE_KEY) || null;
 
 function sessionUrl(path) {
     return sessionId
@@ -1541,20 +1858,67 @@ async function fetchState() {
     }
 }
 
+/* Put every left-sidebar field back to its page-load default */
+function resetFormFields() {
+    // Channels: back to default (CH-1 only)
+    selectedChannels = new Set([1]);
+
+    // Per-channel units and offsets (set in the channel pop-up)
+    Object.keys(channelUnits).forEach(k => delete channelUnits[k]);
+    Object.keys(channelOffsets).forEach(k => delete channelOffsets[k]);
+    closeUnitPopup();
+
+    // Test settings
+    document.getElementById('testMedium').value = 'Air';
+    document.getElementById('testDuration').value = 1;
+    document.getElementById('sampleInterval').value = 1;
+    document.getElementById('maxDrop').value = 2.5;
+
+    // Job & customer details
+    document.getElementById('customerName').value = '';
+    document.getElementById('workOrder').value = '';
+    document.getElementById('operatorName').value = '';
+    document.getElementById('testDate').value = new Date().toISOString().slice(0, 10);
+
+    // Report details
+    document.getElementById('tools').value = '';
+    document.getElementById('jde').value = '';
+    document.getElementById('documents').value = '';
+    // (description is regenerated from the channels below)
+
+    // Read popup
+    closeReadPop();
+
+    // Re-render the dynamic parts (this also resets ratings to 20K)
+    renderChannelGrid();
+    renderRatingInputs();
+    updateActiveCount();
+    updateDescription();
+}
+
 async function resetTest() {
-    if (lastState && lastState.session_id) {
-        if (!confirm('Clear all data from the current test and reset the dashboard?')) return;
-    }
+    if (!confirm('Clear all data and reset every field on the dashboard?')) return;
 
     resetBtn.disabled = true;
 
     try {
-        await fetch(sessionUrl('/api/reset'), { method: 'POST' });
+        // Stops/removes the session on the server (no-op if there is none)
+        if (sessionId) {
+            await fetch(sessionUrl('/api/reset'), { method: 'POST' });
+        }
 
         sessionId = null;
-        sessionStorage.removeItem('pressure_test_session_id');
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        lastState = null;
 
-        await fetchState();
+        resetFormFields();
+
+        // Clear chart immediately, then let the poll redraw the empty state
+        chart.data.labels = [];
+        chart.data.datasets = [];
+        chart.update('none');
+
+        await fetchState();   // empty state: cards, table, summary, timer
     } catch (err) {
         console.error('resetTest failed:', err);
         alert('Could not reset the dashboard.');
@@ -1625,7 +1989,7 @@ async function startTest() {
         }
 
         sessionId = data.session_id;
-        sessionStorage.setItem('pressure_test_session_id', sessionId);
+        sessionStorage.setItem(SESSION_STORAGE_KEY, sessionId);
 
         await fetchState();
     } catch (err) {
@@ -1926,13 +2290,9 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReadPop(); });
 
 document.getElementById('newWindowBtn').addEventListener('click', () => {
-    const width = Math.min(1500, window.screen.availWidth - 40);
-    const height = Math.min(950, window.screen.availHeight - 40);
-
-    window.open(
-        window.location.href,
-        '_blank',
-        `width=${width},height=${height},noopener`
+    window.parent.postMessage(
+        { type: 'pressure-dashboard-new-tab' },
+        window.location.origin
     );
 });
 
@@ -1955,6 +2315,7 @@ updateDescription();
 
 fetchState();
 setInterval(fetchState, 1000);
+}
 </script>
 </body>
 </html>

@@ -1,0 +1,21 @@
+Timestamp,Elapsed Time,CH-1 Pressure,CH-2 Pressure,CH-1 Unit,CH-2 Unit,Test Status,CH-1 Pressure Drop,CH-2 Pressure Drop,Max Allowable Pressure Drop,CH-1 Result,CH-2 Result,Medium
+2026-10-26 08:48:03,0:00:01,2388.62,22.72,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-26 08:48:04,0:00:02,2388.65,22.73,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-26 08:48:06,0:00:04,2388.83,22.72,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-26 08:48:08,0:00:06,2388.59,22.73,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-26 08:48:10,0:00:08,2388.71,22.73,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-26 08:48:11,0:00:09,2388.65,22.73,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-26 08:48:13,0:00:11,2388.63,22.73,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-26 08:48:15,0:00:13,2388.5,22.73,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-26 08:48:17,0:00:15,2388.49,22.73,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-26 08:48:18,0:00:16,2388.29,22.72,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-26 08:48:20,0:00:18,2388.59,22.73,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-26 08:48:22,0:00:20,2388.53,22.73,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-26 08:48:24,0:00:22,2388.38,22.73,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-26 08:48:25,0:00:23,2388.53,22.73,psi,psi,Running,,,2.5,Pending,Pending,Air
+2026-10-26 08:48:28,0:00:26,2388.49,22.72,psi,psi,Holding,0.04,0.01,2.5,Pending,Pending,Air
+2026-10-26 08:48:30,0:00:28,2388.69,22.73,psi,psi,Holding,-0.16,0.0,2.5,Pending,Pending,Air
+2026-10-26 08:48:32,0:00:30,2388.45,22.73,psi,psi,Holding,0.08,0.0,2.5,Pending,Pending,Air
+2026-10-26 08:48:33,0:00:31,2388.48,22.73,psi,psi,Holding,0.05,0.0,2.5,Pending,Pending,Air
+2026-10-26 08:48:35,0:00:33,2388.51,22.73,psi,psi,Holding,0.02,0.0,2.5,Pending,Pending,Air
+2026-10-26 08:48:37,0:00:35,2388.64,22.74,psi,psi,Holding,-0.11,-0.01,2.5,Pending,Pending,Air
